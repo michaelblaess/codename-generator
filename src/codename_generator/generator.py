@@ -95,16 +95,17 @@ class Generator:
         want_mutation = force_mutation or self.rng.random() < mutation_chance
         rendered_theme, mutated = self._render_theme_word(theme_word, want_mutation)
 
+        # source_words[0] ist immer das Theme-Wort, danach folgen Modifier.
         sources: tuple[str, ...]
         match pattern:
             case Pattern.ADJ_THEME:
                 modifier = self._pick(adjectives)
                 name = f"{modifier} {rendered_theme}"
-                sources = (modifier, theme_word)
+                sources = (theme_word, modifier)
             case Pattern.VERB_THEME:
                 modifier = self._pick(verbs)
                 name = f"{modifier} {rendered_theme}"
-                sources = (modifier, theme_word)
+                sources = (theme_word, modifier)
             case Pattern.THEME_VERB:
                 modifier = self._pick(verbs)
                 name = f"{rendered_theme} {modifier}"
@@ -137,22 +138,30 @@ class Generator:
             raise KeyError(f"Unknown theme: {theme_slug}")
         theme = self.themes[theme_slug]
         pool = patterns or tuple(Pattern)
-        seen: set[str] = set()
+        seen_slugs: set[str] = set()
+        seen_theme_words: set[str] = set()
         result: list[Suggestion] = []
         require_mutation = mutation_chance >= 1.0
         attempts = 0
-        max_attempts = count * 30
+        max_attempts = count * 40
         while len(result) < count and attempts < max_attempts:
             attempts += 1
             pattern = self.rng.choice(pool)
             suggestion = self._build(theme, pattern, mutation_chance)
-            if suggestion.slug in seen:
+            if suggestion.slug in seen_slugs:
                 continue
             if require_mutation and not suggestion.mutated:
                 continue
             # Bare source word ohne Modifier und ohne Mutation -> kein Vorschlag.
             if pattern is Pattern.THEME_ONLY and not suggestion.mutated:
                 continue
-            seen.add(suggestion.slug)
+            # Jedes Quellwort des Themes darf nur einmal vorkommen -
+            # sonst tauchen mehrere Mutationen desselben Wortes auf
+            # (z.B. "Forrego" und "Foreggo" aus "Forego").
+            theme_word = suggestion.source_words[0].lower()
+            if theme_word in seen_theme_words:
+                continue
+            seen_slugs.add(suggestion.slug)
+            seen_theme_words.add(theme_word)
             result.append(suggestion)
         return result

@@ -66,6 +66,27 @@ def test_theme_only_never_returns_bare_source_word() -> None:
             assert s.name.lower() not in theme_words, f"bare source word leaked: {s}"
 
 
+def test_each_theme_word_appears_at_most_once() -> None:
+    """Quellwoerter sind dedupliziert - keine Mehrfach-Mutationen desselben Worts."""
+    gen = Generator.load(seed=42)
+    suggestions = gen.suggest("racehorses", count=30, mutation_chance=0.6)
+    theme_words = [s.source_words[0].lower() for s in suggestions]
+    assert len(theme_words) == len(set(theme_words)), (
+        f"duplicate theme words: {theme_words}"
+    )
+
+
+def test_source_words_normalized_theme_first() -> None:
+    """source_words[0] muss immer das Theme-Wort sein, unabhaengig vom Pattern."""
+    gen = Generator.load(seed=11)
+    theme_word_set = {w.lower() for w in gen.themes["flowers"].words}
+    suggestions = gen.suggest("flowers", count=30, mutation_chance=0.0)
+    for s in suggestions:
+        assert s.source_words[0].lower() in theme_word_set, (
+            f"source_words[0] is not from theme: {s}"
+        )
+
+
 def test_random_theme_exists_and_pools_words() -> None:
     gen = Generator.load(seed=0)
     assert "random" in gen.themes

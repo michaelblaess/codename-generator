@@ -10,6 +10,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, ListItem, ListView, RichLog, Static
+from textual_slider import Slider
 from textual_widgets import HorizontalSplitter, VerticalSplitter
 
 from codename_generator import __author__, __version__, __year__
@@ -188,10 +189,23 @@ class CodenameApp(App[None]):
         width: 1fr;
         padding: 0 1;
     }
-    #info {
+    #controls {
         height: 3;
-        color: $text-muted;
         padding: 0 1;
+        align: left middle;
+    }
+    #info {
+        width: 1fr;
+        color: $text-muted;
+        content-align: left middle;
+    }
+    #mutation-slider {
+        width: 24;
+    }
+    #mutation-label {
+        width: 22;
+        color: $text-muted;
+        content-align: right middle;
     }
     #suggestions {
         height: 1fr;
@@ -210,7 +224,7 @@ class CodenameApp(App[None]):
         Binding("r", "regenerate", "Regenerate"),
         Binding("c", "copy_slug", "Copy slug"),
         Binding("n", "copy_name", "Copy name"),
-        Binding("m", "cycle_mutation", "Mutation"),
+        Binding("m", "bump_mutation", "Mutation +25%"),
         Binding("t", "cycle_theme", "Theme"),
         Binding("f", "toggle_favorite", "Fav"),
         Binding("F", "open_favorites", "Show favs"),
@@ -218,14 +232,15 @@ class CodenameApp(App[None]):
         Binding("q", "quit", "Quit"),
     ]
 
-    MUTATION_LEVELS: ClassVar[tuple[float, ...]] = (0.0, 0.2, 0.35, 0.6, 1.0)
+    MUTATION_DEFAULT: ClassVar[int] = 35
+    MUTATION_BUMP: ClassVar[int] = 25
 
     def __init__(self) -> None:
         super().__init__()
         self.generator = Generator.load()
         self.theme_slugs = list(self.generator.themes.keys())
         self.theme_slug = self.theme_slugs[0] if self.theme_slugs else ""
-        self.mutation_idx = 2
+        self.mutation_percent = self.MUTATION_DEFAULT
         self.theme_idx = 0
         self.suggestions: list[Suggestion] = []
         self.favorites: list[Suggestion] = []
@@ -247,7 +262,16 @@ class CodenameApp(App[None]):
                 )
             yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
             with Vertical(id="right-pane"):
-                yield Static(id="info")
+                with Horizontal(id="controls"):
+                    yield Static(id="info")
+                    yield Slider(
+                        min=0,
+                        max=100,
+                        step=5,
+                        value=self.mutation_percent,
+                        id="mutation-slider",
+                    )
+                    yield Static(id="mutation-label")
                 table: DataTable[str] = DataTable(
                     cursor_type="row",
                     zebra_stripes=True,
@@ -274,19 +298,19 @@ class CodenameApp(App[None]):
         log.write(f"[dim]{timestamp}[/dim]  {message}")
 
     def _update_info(self) -> None:
-        mutation = self.MUTATION_LEVELS[self.mutation_idx]
         info = self.query_one("#info", Static)
         info.update(
             f"[b]{self.generator.themes[self.theme_slug].name}[/b]   "
-            f"mutation chance: [b]{mutation:.0%}[/b]   "
             f"theme: [b]{self.theme}[/b]   "
             f"favorites: [b]{len(self.favorites)}[/b]"
         )
+        label = self.query_one("#mutation-label", Static)
+        label.update(f"mutation: [b]{self.mutation_percent}%[/b]")
 
     def _regenerate(self) -> None:
         if not self.theme_slug:
             return
-        mutation = self.MUTATION_LEVELS[self.mutation_idx]
+        mutation = self.mutation_percent / 100.0
         self.suggestions = self.generator.suggest(
             theme_slug=self.theme_slug,
             count=30,
@@ -363,10 +387,23 @@ class CodenameApp(App[None]):
             self.notify(f"Clipboard error: {exc}", severity="error")
             self._log_event(f"[red]clipboard error: {exc}[/red]")
 
-    def action_cycle_mutation(self) -> None:
-        self.mutation_idx = (self.mutation_idx + 1) % len(self.MUTATION_LEVELS)
-        mutation = self.MUTATION_LEVELS[self.mutation_idx]
-        self._log_event(f"mutation chance -> [b]{mutation:.0%}[/b]")
+    def action_bump_mutation(self) -> None:
+        new_value = (self.mutation_percent + self.MUTATION_BUMP) % 105
+        new_value = min(100, new_value - (new_value % 5))
+        self.mutation_percent = new_value
+        slider = self.query_one("#mutation-slider", Slider)
+        slider.value = new_value
+        self._log_event(f"mutation -> [b]{new_value}%[/b]")
+        self._regenerate()
+
+    def on_slider_changed(self, event: Slider.Changed) -> None:
+        if event.slider.id != "mutation-slider":
+            return
+        new_value = int(event.value)
+        if new_value == self.mutation_percent:
+            return
+        self.mutation_percent = new_value
+        self._log_event(f"mutation -> [b]{new_value}%[/b]")
         self._regenerate()
 
     def action_cycle_theme(self) -> None:
