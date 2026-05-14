@@ -1,8 +1,13 @@
 # codename-generator
 
+[![Stars](https://img.shields.io/github/stars/michaelblaess/codename-generator?logo=github&color=yellow)](https://github.com/michaelblaess/codename-generator/stargazers)
+[![Forks](https://img.shields.io/github/forks/michaelblaess/codename-generator?logo=github&color=brightgreen)](https://github.com/michaelblaess/codename-generator/network/members)
+[![Issues](https://img.shields.io/github/issues/michaelblaess/codename-generator?logo=github&color=red)](https://github.com/michaelblaess/codename-generator/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/michaelblaess/codename-generator?logo=github&color=blueviolet)](https://github.com/michaelblaess/codename-generator/pulls)
+[![Last Commit](https://img.shields.io/github/last-commit/michaelblaess/codename-generator?logo=git&logoColor=white)](https://github.com/michaelblaess/codename-generator/commits/main)
 [![CI](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Themes](https://img.shields.io/badge/themes-14-yellow)](src/codename_generator/data/themes)
 
 A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, whisky, ...), get 30 unique suggestions combined with adjective or verb modifiers and optional phonetic mutations.
