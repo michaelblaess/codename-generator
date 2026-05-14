@@ -4,13 +4,15 @@ from datetime import datetime
 from typing import ClassVar
 
 import pyperclip
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, ListItem, ListView, RichLog, Static
 from textual_widgets import HorizontalSplitter, VerticalSplitter
 
+from codename_generator import __author__, __version__, __year__
 from codename_generator.generator import RANDOM_THEME_SLUG, Generator, Suggestion
 
 _TEXTUAL_THEMES = (
@@ -65,49 +67,109 @@ class FavoritesScreen(ModalScreen[None]):
 
 
 class AboutScreen(ModalScreen[None]):
-    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
-        Binding("escape,q,a,enter,space", "dismiss", "Close"),
-    ]
+    """Modal-Dialog mit Informationen ueber die Anwendung."""
 
     DEFAULT_CSS = """
     AboutScreen {
         align: center middle;
     }
-    #about-box {
-        width: 64;
+
+    AboutScreen > VerticalScroll {
+        width: auto;
         height: auto;
-        border: thick $accent;
+        min-width: 56;
+        max-width: 90;
+        max-height: 90%;
         background: $surface;
-        padding: 2 3;
-    }
-    #about-title {
-        text-style: bold;
-        padding-bottom: 1;
-    }
-    #about-quote {
-        text-style: italic;
-        color: $text;
+        border: thick $accent;
         padding: 1 2;
-        background: $boost;
     }
-    #about-attr {
-        padding-top: 1;
-        color: $text-muted;
-        text-align: right;
+
+    AboutScreen #about-title {
+        height: 3;
+        content-align: center middle;
+        text-style: bold;
+        background: $accent;
+        color: $text;
+        margin-bottom: 1;
     }
-    #about-hint {
-        padding-top: 2;
+
+    AboutScreen #about-content {
+        height: auto;
+        padding: 1 2;
+    }
+
+    AboutScreen #about-footer {
+        height: 1;
+        content-align: center middle;
         color: $text-muted;
-        text-align: center;
+        margin-top: 1;
     }
     """
 
+    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
+        Binding("escape", "close", "ESC"),
+        Binding("a,q,enter,space", "close", "Close"),
+    ]
+
     def compose(self) -> ComposeResult:
-        with Vertical(id="about-box"):
+        with VerticalScroll():
             yield Static("codename-generator", id="about-title")
-            yield Static(f'"{_DICKINSON_QUOTE}"', id="about-quote")
-            yield Static("- Emily Dickinson", id="about-attr")
-            yield Static("(press any key to close)", id="about-hint")
+            yield Static(self._build_content(), id="about-content")
+            yield Static("press [b]a[/b] / [b]Esc[/b] to close", id="about-footer", markup=True)
+
+    def _build_content(self) -> Text:
+        text = Text()
+        text.append(f"v{__version__}", style="bold")
+        text.append(" - ", style="dim")
+        text.append(__author__, style="bold")
+        text.append(" - ", style="dim")
+        text.append(__year__, style="bold")
+        text.append("\n\n")
+
+        text.append("Project codename generator with curated themes\n")
+        text.append("and phonetic mutations.\n\n")
+
+        text.append("Themes  ", style="dim")
+        text.append(
+            "Greek/Egyptian/Norse Gods · Constellations · "
+            "Racehorses · Flowers · Gemstones · Wines · Whisky · "
+            "Mountains · Mushrooms · Ships · Landmarks · Random\n\n"
+        )
+
+        text.append("Keys    ", style="dim")
+        text.append("r ", style="bold")
+        text.append("regenerate  ")
+        text.append("c ", style="bold")
+        text.append("copy slug  ")
+        text.append("n ", style="bold")
+        text.append("copy name\n        ")
+        text.append("m ", style="bold")
+        text.append("mutation  ")
+        text.append("t ", style="bold")
+        text.append("textual theme  ")
+        text.append("f ", style="bold")
+        text.append("favorite\n        ")
+        text.append("F ", style="bold")
+        text.append("show favs  ")
+        text.append("a ", style="bold")
+        text.append("about  ")
+        text.append("q ", style="bold")
+        text.append("quit\n\n")
+
+        text.append("-" * 48 + "\n\n", style="dim")
+
+        text.append(
+            f'"{_DICKINSON_QUOTE}"\n\n',
+            style="italic",
+        )
+        text.append(" " * 22)
+        text.append("- Emily Dickinson", style="bold")
+
+        return text
+
+    def action_close(self) -> None:
+        self.dismiss(None)
 
 
 class CodenameApp(App[None]):

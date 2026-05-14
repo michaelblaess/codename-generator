@@ -53,3 +53,25 @@ def test_pattern_enum_covers_all_used() -> None:
     suggestions = gen.suggest("flowers", count=50, mutation_chance=0.0)
     patterns_used = {s.pattern for s in suggestions}
     assert patterns_used.issubset(set(Pattern))
+
+
+def test_theme_only_never_returns_bare_source_word() -> None:
+    """THEME_ONLY-Vorschlaege duerfen niemals identisch mit dem Quellwort sein."""
+    gen = Generator.load(seed=123)
+    theme_words = {w.lower() for w in gen.themes["racehorses"].words}
+    suggestions = gen.suggest("racehorses", count=50, mutation_chance=0.0)
+    for s in suggestions:
+        if s.pattern is Pattern.THEME_ONLY:
+            assert s.mutated, f"theme-only must be mutated: {s}"
+            assert s.name.lower() not in theme_words, f"bare source word leaked: {s}"
+
+
+def test_random_theme_exists_and_pools_words() -> None:
+    gen = Generator.load(seed=0)
+    assert "random" in gen.themes
+    random_words = set(gen.themes["random"].words)
+    other_words: set[str] = set()
+    for slug, theme in gen.themes.items():
+        if slug != "random":
+            other_words.update(theme.words)
+    assert random_words == other_words
