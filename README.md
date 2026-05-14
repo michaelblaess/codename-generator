@@ -17,12 +17,23 @@ Project codename generator with curated themes and phonetic mutations.
 - Mushrooms
 - Historic ships
 
+## Setup
+
+```
+setup.bat        # Windows
+./setup.sh       # macOS/Linux
+```
+
+Requires [uv](https://docs.astral.sh/uv/).
+
 ## Usage
 
 ### TUI (default)
 
 ```
-uv run codename
+run.bat          # Windows
+./run.sh         # macOS/Linux
+uv run codename  # any platform
 ```
 
 Keys: `r` regenerate, `c` copy slug, `n` copy name, `m` cycle mutation chance, `t` cycle Textual theme, `f` toggle favorite, `F` show favorites, `q` quit.
