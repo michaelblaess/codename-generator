@@ -11,6 +11,11 @@ Project codename generator with curated themes and phonetic mutations.
 - Racehorses
 - Flowers
 - Gemstones
+- Wines
+- Whisky
+- Mountains
+- Mushrooms
+- Historic ships
 
 ## Usage
 
