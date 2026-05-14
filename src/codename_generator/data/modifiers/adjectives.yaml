@@ -1,19 +1,8 @@
 name: Adjectives
 words:
+  # generic
   - swift
   - silent
-  - crimson
-  - azure
-  - emerald
-  - golden
-  - silver
-  - obsidian
-  - molten
-  - frozen
-  - electric
-  - lunar
-  - solar
-  - cosmic
   - quiet
   - fierce
   - hidden
@@ -31,11 +20,6 @@ words:
   - calm
   - radiant
   - shadow
-  - velvet
-  - copper
-  - ivory
-  - jade
-  - rusty
   - hollow
   - feral
   - noble
@@ -48,10 +32,10 @@ words:
   - rising
   - falling
   - blazing
-  - icy
-  - misty
-  - stormy
-  - thunder
+  # cosmic / time
+  - lunar
+  - solar
+  - cosmic
   - twilight
   - dawn
   - dusk
@@ -60,3 +44,102 @@ words:
   - alpha
   - zenith
   - nadir
+  # weather
+  - icy
+  - misty
+  - stormy
+  - thunder
+  - foggy
+  - hazy
+  - cloudy
+  - sunny
+  - frosty
+  - breezy
+  - balmy
+  # textures / materials
+  - velvet
+  - molten
+  - frozen
+  - electric
+  - obsidian
+  # colors
+  - crimson
+  - scarlet
+  - vermillion
+  - amber
+  - golden
+  - bronze
+  - copper
+  - rust
+  - rusty
+  - ochre
+  - olive
+  - lime
+  - emerald
+  - jade
+  - mint
+  - teal
+  - turquoise
+  - cyan
+  - cerulean
+  - azure
+  - sapphire
+  - cobalt
+  - indigo
+  - violet
+  - lavender
+  - mauve
+  - magenta
+  - rose
+  - coral
+  - salmon
+  - peach
+  - pearl
+  - ivory
+  - silver
+  - charcoal
+  - onyx
+  - ebony
+  - sable
+  - chestnut
+  # moods (-y)
+  - sleepy
+  - freaky
+  - dreamy
+  - moody
+  - edgy
+  - jumpy
+  - jittery
+  - cranky
+  - perky
+  - sassy
+  - snappy
+  - zippy
+  - peppy
+  - dizzy
+  - fuzzy
+  - frisky
+  - snazzy
+  - witty
+  - gritty
+  - dusty
+  - grumpy
+  - sulky
+  - snarky
+  - plucky
+  - lucky
+  - cocky
+  - cheeky
+  - feisty
+  - dreary
+  - gloomy
+  - chipper
+  - giddy
+  - groovy
+  - shifty
+  - shaky
+  - sneaky
+  - spunky
+  - twitchy
+  - wonky
+  - zany
