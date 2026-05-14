@@ -138,6 +138,12 @@ class Generator:
             raise KeyError(f"Unknown theme: {theme_slug}")
         theme = self.themes[theme_slug]
         pool = patterns or tuple(Pattern)
+        # Bei 0% Mutation den THEME_ONLY-Pattern weglassen - er wuerde sonst
+        # trotzdem ein mutiertes Wort erzeugen (sein Force-Mutation-Pfad).
+        if mutation_chance <= 0.0:
+            pool = tuple(p for p in pool if p is not Pattern.THEME_ONLY)
+            if not pool:
+                return []
         seen_slugs: set[str] = set()
         seen_theme_words: set[str] = set()
         result: list[Suggestion] = []
