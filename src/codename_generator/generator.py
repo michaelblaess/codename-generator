@@ -89,7 +89,10 @@ class Generator:
         adjectives = self.modifiers["adjectives"].words
         verbs = self.modifiers["verbs"].words
         theme_word = self._pick(theme.words)
-        want_mutation = self.rng.random() < mutation_chance
+        # Ohne Modifier waere eine nicht-mutierte Suggestion identisch mit dem
+        # Quellwort - dann zwingend mutieren, sonst wird der Vorschlag verworfen.
+        force_mutation = pattern is Pattern.THEME_ONLY
+        want_mutation = force_mutation or self.rng.random() < mutation_chance
         rendered_theme, mutated = self._render_theme_word(theme_word, want_mutation)
 
         sources: tuple[str, ...]
@@ -146,6 +149,9 @@ class Generator:
             if suggestion.slug in seen:
                 continue
             if require_mutation and not suggestion.mutated:
+                continue
+            # Bare source word ohne Modifier und ohne Mutation -> kein Vorschlag.
+            if pattern is Pattern.THEME_ONLY and not suggestion.mutated:
                 continue
             seen.add(suggestion.slug)
             result.append(suggestion)

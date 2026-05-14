@@ -33,10 +33,19 @@ def test_suggest_unknown_theme_raises() -> None:
     raise AssertionError("expected KeyError")
 
 
-def test_suggest_no_mutation_keeps_originals() -> None:
+def test_suggest_no_mutation_keeps_originals_except_theme_only() -> None:
+    """Mit mutation_chance=0 sind nur Modifier-Patterns unmutiert.
+
+    Pattern.THEME_ONLY erzwingt immer Mutation, da das Quellwort sonst
+    unveraendert als Vorschlag erscheinen wuerde.
+    """
     gen = Generator.load(seed=7)
-    suggestions = gen.suggest("greek-gods", count=10, mutation_chance=0.0)
-    assert all(not s.mutated for s in suggestions)
+    suggestions = gen.suggest("greek-gods", count=20, mutation_chance=0.0)
+    for s in suggestions:
+        if s.pattern is Pattern.THEME_ONLY:
+            assert s.mutated, f"THEME_ONLY must always be mutated: {s}"
+        else:
+            assert not s.mutated, f"non-THEME_ONLY must not be mutated at 0%: {s}"
 
 
 def test_pattern_enum_covers_all_used() -> None:
