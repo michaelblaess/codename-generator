@@ -11,7 +11,11 @@ dependencies = [
     "textual>=0.83",
     "pyyaml>=6.0",
     "pyperclip>=1.9",
+    "textual-widgets",
 ]
+
+[tool.uv.sources]
+textual-widgets = { git = "https://github.com/michaelblaess/textual-widgets.git" }
 
 [dependency-groups]
 dev = [
@@ -42,7 +46,7 @@ strict = true
 python_version = "3.13"
 
 [[tool.mypy.overrides]]
-module = ["pyperclip"]
+module = ["pyperclip", "textual_widgets", "textual_widgets.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

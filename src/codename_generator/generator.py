@@ -8,6 +8,9 @@ from enum import StrEnum
 from codename_generator.phonetic import mutate
 from codename_generator.wordlist import WordList, load_modifiers, load_themes
 
+RANDOM_THEME_SLUG = "random"
+_MUTATION_RETRIES = 5
+
 
 class Pattern(StrEnum):
     ADJ_THEME = "adj-theme"
@@ -32,6 +35,17 @@ def _slugify(text: str) -> str:
     return _SLUG_RE.sub("-", text.lower()).strip("-")
 
 
+def _build_random_theme(themes: dict[str, WordList]) -> WordList:
+    """Virtuelles Random-Theme: alle Woerter aus allen Themes zusammen."""
+    pooled = tuple(sorted({w for t in themes.values() for w in t.words}))
+    return WordList(
+        slug=RANDOM_THEME_SLUG,
+        name="Random (all themes)",
+        description="Pooled from every theme",
+        words=pooled,
+    )
+
+
 @dataclass
 class Generator:
     themes: dict[str, WordList]
@@ -40,14 +54,31 @@ class Generator:
 
     @classmethod
     def load(cls, seed: int | None = None) -> Generator:
+        themes = load_themes()
+        themes_with_random: dict[str, WordList] = {RANDOM_THEME_SLUG: _build_random_theme(themes)}
+        themes_with_random.update(themes)
         return cls(
-            themes=load_themes(),
+            themes=themes_with_random,
             modifiers=load_modifiers(),
             rng=random.Random(seed),
         )
 
     def _pick(self, words: tuple[str, ...]) -> str:
         return self.rng.choice(words)
+
+    def _render_theme_word(
+        self,
+        theme_word: str,
+        want_mutation: bool,
+    ) -> tuple[str, bool]:
+        """Wende Mutation an. Wenn keine Aenderung erreichbar, false zurueck."""
+        if not want_mutation:
+            return theme_word, False
+        for _ in range(_MUTATION_RETRIES):
+            candidate = mutate(theme_word, self.rng)
+            if candidate != theme_word:
+                return candidate, True
+        return theme_word, False
 
     def _build(
         self,
@@ -58,8 +89,8 @@ class Generator:
         adjectives = self.modifiers["adjectives"].words
         verbs = self.modifiers["verbs"].words
         theme_word = self._pick(theme.words)
-        mutated = self.rng.random() < mutation_chance
-        rendered_theme = mutate(theme_word, self.rng) if mutated else theme_word
+        want_mutation = self.rng.random() < mutation_chance
+        rendered_theme, mutated = self._render_theme_word(theme_word, want_mutation)
 
         sources: tuple[str, ...]
         match pattern:
@@ -94,20 +125,27 @@ class Generator:
         mutation_chance: float = 0.35,
         patterns: tuple[Pattern, ...] | None = None,
     ) -> list[Suggestion]:
-        """Generiere `count` Codenamen-Vorschlaege fuer ein Theme."""
+        """Generiere `count` Codenamen-Vorschlaege fuer ein Theme.
+
+        Wenn mutation_chance == 1.0, werden nur Vorschlaege akzeptiert, deren
+        Theme-Wort tatsaechlich phonetisch mutiert wurde.
+        """
         if theme_slug not in self.themes:
             raise KeyError(f"Unknown theme: {theme_slug}")
         theme = self.themes[theme_slug]
         pool = patterns or tuple(Pattern)
         seen: set[str] = set()
         result: list[Suggestion] = []
+        require_mutation = mutation_chance >= 1.0
         attempts = 0
-        max_attempts = count * 20
+        max_attempts = count * 30
         while len(result) < count and attempts < max_attempts:
             attempts += 1
             pattern = self.rng.choice(pool)
             suggestion = self._build(theme, pattern, mutation_chance)
             if suggestion.slug in seen:
+                continue
+            if require_mutation and not suggestion.mutated:
                 continue
             seen.add(suggestion.slug)
             result.append(suggestion)
