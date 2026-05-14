@@ -31,7 +31,7 @@ Keys: `r` regenerate, `c` copy slug, `n` copy name, `m` cycle mutation chance, `
 
 ```
 uv run codename --list-themes
-uv run codename -t greek-gods -n 10
+uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 ```
 

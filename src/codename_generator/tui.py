@@ -163,7 +163,7 @@ class CodenameApp(App[None]):
         mutation = self.MUTATION_LEVELS[self.mutation_idx]
         self.suggestions = self.generator.suggest(
             theme_slug=self.theme_slug,
-            count=10,
+            count=30,
             mutation_chance=mutation,
         )
         table = self.query_one("#suggestions", DataTable)

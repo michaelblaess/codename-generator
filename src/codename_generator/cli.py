@@ -16,7 +16,7 @@ def main() -> int:
         "-t",
         help="Theme slug (e.g. greek-gods, flowers). Omit to launch TUI.",
     )
-    parser.add_argument("--count", "-n", type=int, default=10, help="How many suggestions")
+    parser.add_argument("--count", "-n", type=int, default=30, help="How many suggestions")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
         "--mutation-chance",
