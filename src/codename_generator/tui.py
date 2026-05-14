@@ -132,13 +132,11 @@ class CodenameApp(App[None]):
         padding: 0 1;
     }
     #suggestions {
-        height: 24;
+        height: 1fr;
     }
     #log {
-        height: 1fr;
+        height: 6;
         background: $boost;
-        border-left: tall $panel;
-        border-right: tall $panel;
         padding: 0 1;
     }
     ListView > ListItem.--highlight {
