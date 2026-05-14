@@ -33,19 +33,19 @@ def test_suggest_unknown_theme_raises() -> None:
     raise AssertionError("expected KeyError")
 
 
-def test_suggest_no_mutation_keeps_originals_except_theme_only() -> None:
-    """Mit mutation_chance=0 sind nur Modifier-Patterns unmutiert.
+def test_zero_mutation_chance_produces_no_mutations() -> None:
+    """Bei mutation_chance=0 darf nichts mutiert sein, auch kein THEME_ONLY.
 
-    Pattern.THEME_ONLY erzwingt immer Mutation, da das Quellwort sonst
-    unveraendert als Vorschlag erscheinen wuerde.
+    Der THEME_ONLY-Pattern faellt bei 0% komplett weg, weil er sonst sein
+    eigenes Force-Mutation-Verhalten triggern wuerde.
     """
     gen = Generator.load(seed=7)
     suggestions = gen.suggest("greek-gods", count=20, mutation_chance=0.0)
     for s in suggestions:
-        if s.pattern is Pattern.THEME_ONLY:
-            assert s.mutated, f"THEME_ONLY must always be mutated: {s}"
-        else:
-            assert not s.mutated, f"non-THEME_ONLY must not be mutated at 0%: {s}"
+        assert not s.mutated, f"no suggestion may be mutated at 0%: {s}"
+        assert s.pattern is not Pattern.THEME_ONLY, (
+            f"THEME_ONLY must not appear at 0%: {s}"
+        )
 
 
 def test_pattern_enum_covers_all_used() -> None:
@@ -59,7 +59,8 @@ def test_theme_only_never_returns_bare_source_word() -> None:
     """THEME_ONLY-Vorschlaege duerfen niemals identisch mit dem Quellwort sein."""
     gen = Generator.load(seed=123)
     theme_words = {w.lower() for w in gen.themes["racehorses"].words}
-    suggestions = gen.suggest("racehorses", count=50, mutation_chance=0.0)
+    # mutation_chance > 0 noetig, sonst kommt THEME_ONLY gar nicht vor
+    suggestions = gen.suggest("racehorses", count=50, mutation_chance=0.3)
     for s in suggestions:
         if s.pattern is Pattern.THEME_ONLY:
             assert s.mutated, f"theme-only must be mutated: {s}"
