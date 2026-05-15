@@ -35,9 +35,12 @@ run.bat          # Windows
 uv run codename  # any platform
 ```
 
-Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle Textual theme · `f` favorite · `F` show favorites · `a` about · `q` quit
+Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `a` about · `q` quit
 
-The mutation chance is also adjustable via a slider in the top bar.
+The mutation chance is also adjustable via a slider in the top bar. Ships with
+35+ themes (Textual built-ins plus retro palettes) — switch with `t` or the
+Ctrl+P theme picker. Chosen theme, mutation chance and favorites are persisted
+to `~/.codename-generator/settings.json` across restarts.
 
 ### CLI
 

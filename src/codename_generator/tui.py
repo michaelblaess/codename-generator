@@ -11,31 +11,19 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, ListItem, ListView, RichLog, Static
 from textual_slider import Slider
+from textual_themes import register_all
 from textual_widgets import HorizontalSplitter, VerticalSplitter
 
 from codename_generator import __author__, __version__, __year__
-from codename_generator.generator import RANDOM_THEME_SLUG, Generator, Suggestion
-
-_TEXTUAL_THEMES = (
-    "textual-dark",
-    "textual-light",
-    "nord",
-    "gruvbox",
-    "catppuccin-mocha",
-    "catppuccin-latte",
-    "dracula",
-    "tokyo-night",
-    "monokai",
-    "flexoki",
-    "solarized-light",
-)
+from codename_generator.generator import RANDOM_THEME_SLUG, Generator, Pattern, Suggestion
+from codename_generator.settings import JsonSettingsStore
 
 _DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
 
 
 class FavoritesScreen(ModalScreen[None]):
     BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
-        Binding("escape,q,f", "dismiss", "Close"),
+        Binding("escape,q,Q,v,V", "dismiss", "Close"),
     ]
 
     DEFAULT_CSS = """
@@ -91,7 +79,7 @@ class AboutScreen(ModalScreen[None]):
         content-align: center middle;
         text-style: bold;
         background: $accent;
-        color: $text;
+        color: auto;
         margin-bottom: 1;
     }
 
@@ -110,7 +98,7 @@ class AboutScreen(ModalScreen[None]):
 
     BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
         Binding("escape", "close", "ESC"),
-        Binding("a,q,enter,space", "close", "Close"),
+        Binding("a,A,q,Q,enter,space", "close", "Close"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -148,11 +136,11 @@ class AboutScreen(ModalScreen[None]):
         text.append("m ", style="bold")
         text.append("mutation  ")
         text.append("t ", style="bold")
-        text.append("textual theme  ")
+        text.append("cycle theme  ")
         text.append("f ", style="bold")
         text.append("favorite\n        ")
-        text.append("F ", style="bold")
-        text.append("show favs  ")
+        text.append("v ", style="bold")
+        text.append("view favs  ")
         text.append("a ", style="bold")
         text.append("about  ")
         text.append("q ", style="bold")
@@ -221,29 +209,96 @@ class CodenameApp(App[None]):
     """
 
     BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
-        Binding("r", "regenerate", "Regenerate"),
-        Binding("c", "copy_slug", "Copy slug"),
-        Binding("n", "copy_name", "Copy name"),
-        Binding("m", "bump_mutation", "Mutation +25%"),
-        Binding("t", "cycle_theme", "Theme"),
-        Binding("f", "toggle_favorite", "Fav"),
-        Binding("F", "open_favorites", "Show favs"),
-        Binding("a", "about", "About"),
-        Binding("q", "quit", "Quit"),
+        Binding("r,R", "regenerate", "Regenerate", key_display="r"),
+        Binding("c,C", "copy_slug", "Copy slug", key_display="c"),
+        Binding("n,N", "copy_name", "Copy name", key_display="n"),
+        Binding("m,M", "bump_mutation", "Mutation +25%", key_display="m"),
+        Binding("t,T", "cycle_theme", "Theme", key_display="t"),
+        Binding("f,F", "toggle_favorite", "Fav", key_display="f"),
+        Binding("v,V", "open_favorites", "View favs", key_display="v"),
+        Binding("a,A", "about", "About", key_display="a"),
+        Binding("q,Q", "quit", "Quit", key_display="q"),
     ]
 
     MUTATION_DEFAULT: ClassVar[int] = 35
     MUTATION_BUMP: ClassVar[int] = 25
+    DEFAULT_THEME: ClassVar[str] = "textual-dark"
 
     def __init__(self) -> None:
         super().__init__()
+        self._settings_store = JsonSettingsStore()
+        register_all(self)  # type: ignore[arg-type]
+
         self.generator = Generator.load()
         self.theme_slugs = list(self.generator.themes.keys())
         self.theme_slug = self.theme_slugs[0] if self.theme_slugs else ""
-        self.mutation_percent = self.MUTATION_DEFAULT
-        self.theme_idx = 0
         self.suggestions: list[Suggestion] = []
-        self.favorites: list[Suggestion] = []
+
+        settings = self._settings_store.load()
+        self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
+        self.favorites = self._deserialize_favorites(settings.get("favorites"))
+        self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
+
+    @staticmethod
+    def _coerce_mutation(raw: object) -> int:
+        if not isinstance(raw, (int, float, str)):
+            return CodenameApp.MUTATION_DEFAULT
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return CodenameApp.MUTATION_DEFAULT
+        return max(0, min(100, value - (value % 5)))
+
+    @staticmethod
+    def _deserialize_favorites(raw: object) -> list[Suggestion]:
+        if not isinstance(raw, list):
+            return []
+        result: list[Suggestion] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            try:
+                result.append(
+                    Suggestion(
+                        name=str(item["name"]),
+                        slug=str(item["slug"]),
+                        pattern=Pattern(str(item["pattern"])),
+                        mutated=bool(item["mutated"]),
+                        source_words=tuple(str(w) for w in item["source_words"]),
+                    )
+                )
+            except (KeyError, ValueError, TypeError):
+                continue
+        return result
+
+    def _serialize_favorites(self) -> list[dict[str, object]]:
+        return [
+            {
+                "name": f.name,
+                "slug": f.slug,
+                "pattern": f.pattern.value,
+                "mutated": f.mutated,
+                "source_words": list(f.source_words),
+            }
+            for f in self.favorites
+        ]
+
+    def _save_settings(self) -> None:
+        self._settings_store.save(
+            {
+                "theme": self.theme,
+                "mutation_percent": self.mutation_percent,
+                "favorites": self._serialize_favorites(),
+            }
+        )
+
+    def watch_theme(self, theme_name: str) -> None:
+        """Persistiert jede Theme-Aenderung (auch via Ctrl+P Theme-Picker)."""
+        if not hasattr(self, "_settings_store"):
+            return
+        if self._settings_store.load().get("theme") == theme_name:
+            return
+        self._save_settings()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -284,7 +339,8 @@ class CodenameApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.theme = _TEXTUAL_THEMES[self.theme_idx]
+        if self._startup_theme in self.available_themes:
+            self.theme = self._startup_theme
         self.title = "codename-generator"
         self.sub_title = self.theme_slug
         list_view = self.query_one("#theme-list", ListView)
@@ -293,7 +349,10 @@ class CodenameApp(App[None]):
         self._regenerate()
 
     def _log_event(self, message: str) -> None:
-        log = self.query_one("#log", RichLog)
+        try:
+            log = self.query_one("#log", RichLog)
+        except Exception:
+            return
         timestamp = datetime.now().strftime("%H:%M:%S")
         log.write(f"[dim]{timestamp}[/dim]  {message}")
 
@@ -338,26 +397,22 @@ class CodenameApp(App[None]):
         return None
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        item_id = event.item.id or ""
-        if item_id.startswith("theme-"):
-            slug = item_id[len("theme-") :]
-            if slug in self.generator.themes:
-                self.theme_slug = slug
-                self.sub_title = slug
-                self._log_event(f"theme -> [b]{slug}[/b]")
-                self._regenerate()
+        self._switch_theme(event.item.id or "")
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         if event.item is None:
             return
-        item_id = event.item.id or ""
-        if item_id.startswith("theme-"):
-            slug = item_id[len("theme-") :]
-            if slug in self.generator.themes and slug != self.theme_slug:
-                self.theme_slug = slug
-                self.sub_title = slug
-                self._log_event(f"theme -> [b]{slug}[/b]")
-                self._regenerate()
+        self._switch_theme(event.item.id or "")
+
+    def _switch_theme(self, item_id: str) -> None:
+        if not item_id.startswith("theme-"):
+            return
+        slug = item_id[len("theme-") :]
+        if slug in self.generator.themes and slug != self.theme_slug:
+            self.theme_slug = slug
+            self.sub_title = slug
+            self._log_event(f"theme -> [b]{slug}[/b]")
+            self._regenerate()
 
     def action_regenerate(self) -> None:
         self._log_event("regenerated")
@@ -394,6 +449,7 @@ class CodenameApp(App[None]):
         slider = self.query_one("#mutation-slider", Slider)
         slider.value = new_value
         self._log_event(f"mutation -> [b]{new_value}%[/b]")
+        self._save_settings()
         self._regenerate()
 
     def on_slider_changed(self, event: Slider.Changed) -> None:
@@ -404,12 +460,19 @@ class CodenameApp(App[None]):
             return
         self.mutation_percent = new_value
         self._log_event(f"mutation -> [b]{new_value}%[/b]")
+        self._save_settings()
         self._regenerate()
 
     def action_cycle_theme(self) -> None:
-        self.theme_idx = (self.theme_idx + 1) % len(_TEXTUAL_THEMES)
-        self.theme = _TEXTUAL_THEMES[self.theme_idx]
-        self._log_event(f"textual theme -> [b]{self.theme}[/b]")
+        themes = sorted(self.available_themes)
+        if not themes:
+            return
+        try:
+            idx = themes.index(self.theme)
+        except ValueError:
+            idx = -1
+        self.theme = themes[(idx + 1) % len(themes)]
+        self._log_event(f"theme -> [b]{self.theme}[/b]")
         self._update_info()
 
     def action_toggle_favorite(self) -> None:
@@ -425,6 +488,7 @@ class CodenameApp(App[None]):
             self.favorites.append(s)
             self.notify(f"Added favorite: {s.name}")
             self._log_event(f"fav [b]{s.name}[/b]")
+        self._save_settings()
         self._update_info()
 
     def action_open_favorites(self) -> None:
