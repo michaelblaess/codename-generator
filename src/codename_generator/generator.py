@@ -17,6 +17,17 @@ class Pattern(StrEnum):
     VERB_THEME = "verb-theme"
     THEME_VERB = "theme-verb"
     THEME_ONLY = "theme"
+    ADJ_THEME_VERB = "adj-theme-verb"
+
+
+# Anzahl der Komponenten (Modifier + Theme-Wort) pro Pattern.
+PATTERN_WORD_COUNT: dict[Pattern, int] = {
+    Pattern.THEME_ONLY: 1,
+    Pattern.ADJ_THEME: 2,
+    Pattern.VERB_THEME: 2,
+    Pattern.THEME_VERB: 2,
+    Pattern.ADJ_THEME_VERB: 3,
+}
 
 
 @dataclass(frozen=True)
@@ -113,6 +124,11 @@ class Generator:
             case Pattern.THEME_ONLY:
                 name = rendered_theme
                 sources = (theme_word,)
+            case Pattern.ADJ_THEME_VERB:
+                adjective = self._pick(adjectives)
+                verb = self._pick(verbs)
+                name = f"{adjective} {rendered_theme} {verb}"
+                sources = (theme_word, adjective, verb)
 
         return Suggestion(
             name=name.title(),
@@ -128,22 +144,26 @@ class Generator:
         count: int = 10,
         mutation_chance: float = 0.35,
         patterns: tuple[Pattern, ...] | None = None,
+        max_words: int = 3,
     ) -> list[Suggestion]:
         """Generiere `count` Codenamen-Vorschlaege fuer ein Theme.
 
         Wenn mutation_chance == 1.0, werden nur Vorschlaege akzeptiert, deren
-        Theme-Wort tatsaechlich phonetisch mutiert wurde.
+        Theme-Wort tatsaechlich phonetisch mutiert wurde. `max_words` begrenzt
+        die Anzahl der Namens-Komponenten (1..3).
         """
         if theme_slug not in self.themes:
             raise KeyError(f"Unknown theme: {theme_slug}")
         theme = self.themes[theme_slug]
         pool = patterns or tuple(Pattern)
+        # Pattern auf die maximale Wortzahl begrenzen.
+        pool = tuple(p for p in pool if PATTERN_WORD_COUNT[p] <= max_words)
         # Bei 0% Mutation den THEME_ONLY-Pattern weglassen - er wuerde sonst
         # trotzdem ein mutiertes Wort erzeugen (sein Force-Mutation-Pfad).
         if mutation_chance <= 0.0:
             pool = tuple(p for p in pool if p is not Pattern.THEME_ONLY)
-            if not pool:
-                return []
+        if not pool:
+            return []
         seen_slugs: set[str] = set()
         seen_theme_words: set[str] = set()
         result: list[Suggestion] = []

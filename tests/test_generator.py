@@ -1,6 +1,28 @@
 from __future__ import annotations
 
-from codename_generator.generator import Generator, Pattern
+from codename_generator.generator import PATTERN_WORD_COUNT, Generator, Pattern
+
+
+def test_max_words_one_yields_only_single_component() -> None:
+    gen = Generator.load(seed=3)
+    suggestions = gen.suggest("greek-gods", count=20, mutation_chance=0.6, max_words=1)
+    assert suggestions
+    for s in suggestions:
+        assert s.pattern is Pattern.THEME_ONLY, f"max_words=1 must be theme-only: {s}"
+
+
+def test_max_words_two_excludes_three_word_pattern() -> None:
+    gen = Generator.load(seed=3)
+    suggestions = gen.suggest("flowers", count=30, mutation_chance=0.5, max_words=2)
+    for s in suggestions:
+        assert PATTERN_WORD_COUNT[s.pattern] <= 2, f"too many words: {s}"
+
+
+def test_max_words_three_allows_adj_theme_verb() -> None:
+    gen = Generator.load(seed=3)
+    suggestions = gen.suggest("flowers", count=60, mutation_chance=0.5, max_words=3)
+    patterns = {s.pattern for s in suggestions}
+    assert Pattern.ADJ_THEME_VERB in patterns
 
 
 def test_load_generator() -> None:

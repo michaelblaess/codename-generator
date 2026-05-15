@@ -177,23 +177,31 @@ class CodenameApp(App[None]):
         width: 1fr;
         padding: 0 1;
     }
-    #controls {
-        height: 3;
-        padding: 0 1;
-        align: left middle;
-    }
     #info {
-        width: 1fr;
+        height: 1;
         color: $text-muted;
         content-align: left middle;
+        padding: 0 1;
     }
-    #mutation-slider {
-        width: 24;
+    #theme-list {
+        height: 1fr;
     }
-    #mutation-label {
-        width: 22;
+    #settings-pane {
+        height: 11;
+        padding: 1 1 0 1;
+        background: $boost;
+    }
+    #settings-title {
+        text-style: bold;
+        padding: 0;
+    }
+    .settings-label {
         color: $text-muted;
-        content-align: right middle;
+        padding: 0;
+    }
+    .settings-slider {
+        width: 1fr;
+        margin-bottom: 1;
     }
     #suggestions {
         height: 1fr;
@@ -222,6 +230,7 @@ class CodenameApp(App[None]):
 
     MUTATION_DEFAULT: ClassVar[int] = 35
     MUTATION_BUMP: ClassVar[int] = 25
+    MAX_WORDS_DEFAULT: ClassVar[int] = 3
     DEFAULT_THEME: ClassVar[str] = "textual-dark"
 
     def __init__(self) -> None:
@@ -236,6 +245,7 @@ class CodenameApp(App[None]):
 
         settings = self._settings_store.load()
         self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
+        self.max_words = self._coerce_words(settings.get("max_words"))
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
@@ -248,6 +258,16 @@ class CodenameApp(App[None]):
         except (TypeError, ValueError):
             return CodenameApp.MUTATION_DEFAULT
         return max(0, min(100, value - (value % 5)))
+
+    @staticmethod
+    def _coerce_words(raw: object) -> int:
+        if not isinstance(raw, (int, float, str)):
+            return CodenameApp.MAX_WORDS_DEFAULT
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return CodenameApp.MAX_WORDS_DEFAULT
+        return max(1, min(3, value))
 
     @staticmethod
     def _deserialize_favorites(raw: object) -> list[Suggestion]:
@@ -288,6 +308,7 @@ class CodenameApp(App[None]):
             {
                 "theme": self.theme,
                 "mutation_percent": self.mutation_percent,
+                "max_words": self.max_words,
                 "favorites": self._serialize_favorites(),
             }
         )
@@ -315,18 +336,30 @@ class CodenameApp(App[None]):
                     ],
                     id="theme-list",
                 )
-            yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
-            with Vertical(id="right-pane"):
-                with Horizontal(id="controls"):
-                    yield Static(id="info")
+                yield HorizontalSplitter(target_id="theme-list", min_size=6)
+                with Vertical(id="settings-pane"):
+                    yield Static("Settings", id="settings-title")
+                    yield Static(id="mutation-label", classes="settings-label")
                     yield Slider(
                         min=0,
                         max=100,
                         step=5,
                         value=self.mutation_percent,
                         id="mutation-slider",
+                        classes="settings-slider",
                     )
-                    yield Static(id="mutation-label")
+                    yield Static(id="wordcount-label", classes="settings-label")
+                    yield Slider(
+                        min=1,
+                        max=3,
+                        step=1,
+                        value=self.max_words,
+                        id="wordcount-slider",
+                        classes="settings-slider",
+                    )
+            yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
+            with Vertical(id="right-pane"):
+                yield Static(id="info")
                 table: DataTable[str] = DataTable(
                     cursor_type="row",
                     zebra_stripes=True,
@@ -363,8 +396,12 @@ class CodenameApp(App[None]):
             f"theme: [b]{self.theme}[/b]   "
             f"favorites: [b]{len(self.favorites)}[/b]"
         )
-        label = self.query_one("#mutation-label", Static)
-        label.update(f"mutation: [b]{self.mutation_percent}%[/b]")
+        self.query_one("#mutation-label", Static).update(
+            f"Mutation: [b]{self.mutation_percent}%[/b]"
+        )
+        self.query_one("#wordcount-label", Static).update(
+            f"Words: max [b]{self.max_words}[/b]"
+        )
 
     def _regenerate(self) -> None:
         if not self.theme_slug:
@@ -374,6 +411,7 @@ class CodenameApp(App[None]):
             theme_slug=self.theme_slug,
             count=30,
             mutation_chance=mutation,
+            max_words=self.max_words,
         )
         table = self.query_one("#suggestions", DataTable)
         table.clear()
@@ -453,13 +491,19 @@ class CodenameApp(App[None]):
         self._regenerate()
 
     def on_slider_changed(self, event: Slider.Changed) -> None:
-        if event.slider.id != "mutation-slider":
-            return
         new_value = int(event.value)
-        if new_value == self.mutation_percent:
+        if event.slider.id == "mutation-slider":
+            if new_value == self.mutation_percent:
+                return
+            self.mutation_percent = new_value
+            self._log_event(f"mutation -> [b]{new_value}%[/b]")
+        elif event.slider.id == "wordcount-slider":
+            if new_value == self.max_words:
+                return
+            self.max_words = new_value
+            self._log_event(f"max words -> [b]{new_value}[/b]")
+        else:
             return
-        self.mutation_percent = new_value
-        self._log_event(f"mutation -> [b]{new_value}%[/b]")
         self._save_settings()
         self._regenerate()
 
