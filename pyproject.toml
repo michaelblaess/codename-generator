@@ -33,6 +33,7 @@ dependencies = [
     "pyyaml>=6.0",
     "pyperclip>=1.9",
     "textual-widgets",
+    "textual-themes",
     "textual-slider>=0.1.0",
 ]
 
@@ -43,6 +44,7 @@ Issues = "https://github.com/michaelblaess/codename-generator/issues"
 
 [tool.uv.sources]
 textual-widgets = { git = "https://github.com/michaelblaess/textual-widgets.git", tag = "v0.8.0" }
+textual-themes = { git = "https://github.com/michaelblaess/textual-themes.git", tag = "v0.2.1" }
 
 [dependency-groups]
 dev = [
@@ -73,7 +75,15 @@ strict = true
 python_version = "3.13"
 
 [[tool.mypy.overrides]]
-module = ["pyperclip", "textual_widgets", "textual_widgets.*"]
+module = [
+    "pyperclip",
+    "textual_widgets",
+    "textual_widgets.*",
+    "textual_themes",
+    "textual_themes.*",
+    "textual_slider",
+    "textual_slider.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
