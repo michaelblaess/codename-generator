@@ -31,8 +31,8 @@ Zwei Themen nutzen ihre eigenen kuratierten Wort-Pools:
   (`Mythos`, `Skyline`, `Oracle`, `Aegis`).
 
 Ein Theme-YAML kann die globalen Modifikator-Pools (`adjectives`, `verbs`)
-ueberschreiben, `patterns` einschraenken, blanke unmutierte Woerter erlauben
-(`bare: true`) oder die Mutation deaktivieren (`mutate: false`).
+ueberschreiben, die Namens-`patterns` einschraenken, die Mutation deaktivieren
+(`mutate: false`) oder den Start-Mutationswert setzen (`default_mutation`).
 
 ## Einrichtung
 
