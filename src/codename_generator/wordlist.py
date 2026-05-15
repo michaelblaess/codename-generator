@@ -18,8 +18,6 @@ class WordList:
     adjectives: tuple[str, ...] = field(default_factory=tuple)
     verbs: tuple[str, ...] = field(default_factory=tuple)
     patterns: tuple[str, ...] = field(default_factory=tuple)
-    # bare: erlaubt nicht-mutierte Einzelwoerter als Vorschlag.
-    bare: bool = False
     # mutate: schaltet phonetische Mutation fuer dieses Theme ab wenn False.
     mutate: bool = True
     # default_mutation: Start-Mutationswert in Prozent beim Wechsel zum Theme.
@@ -54,7 +52,6 @@ def _wordlist_from_path(path: Path) -> WordList:
         adjectives=_str_tuple(data.get("adjectives")),
         verbs=_str_tuple(data.get("verbs")),
         patterns=_str_tuple(data.get("patterns")),
-        bare=bool(data.get("bare", False)),
         mutate=bool(data.get("mutate", True)),
         default_mutation=_optional_int(data.get("default_mutation")),
     )

@@ -10,6 +10,7 @@ from codename_generator.wordlist import WordList, load_modifiers, load_themes
 
 RANDOM_THEME_SLUG = "random"
 _MUTATION_RETRIES = 5
+_SEED_CEILING = 2**31
 
 
 class Pattern(StrEnum):
@@ -28,6 +29,25 @@ PATTERN_WORD_COUNT: dict[Pattern, int] = {
     Pattern.THEME_VERB: 2,
     Pattern.ADJ_THEME_VERB: 3,
 }
+
+_TWO_WORD_PATTERNS = (Pattern.ADJ_THEME, Pattern.VERB_THEME, Pattern.THEME_VERB)
+
+
+@dataclass(frozen=True)
+class Recipe:
+    """Die stabilen Zutaten eines Vorschlags - unabhaengig von Mutation/Wortzahl.
+
+    Ein Recipe wird einmal zufaellig erzeugt und bleibt erhalten. Erst `render`
+    macht daraus eine konkrete Suggestion - mit aktueller Mutation und Wortzahl.
+    So aendert ein Slider nur die Darstellung, nicht die Grundzutaten.
+    """
+
+    theme_word: str
+    adjective: str
+    verb: str
+    pattern_index: int
+    mutation_roll: float
+    mutation_seed: int
 
 
 @dataclass(frozen=True)
@@ -85,65 +105,88 @@ class Generator:
             rng=random.Random(seed),
         )
 
-    def _pick(self, words: tuple[str, ...]) -> str:
-        return self.rng.choice(words)
-
-    def _render_theme_word(
-        self,
-        theme_word: str,
-        want_mutation: bool,
-    ) -> tuple[str, bool]:
-        """Wende Mutation an. Wenn keine Aenderung erreichbar, false zurueck."""
-        if not want_mutation:
-            return theme_word, False
-        for _ in range(_MUTATION_RETRIES):
-            candidate = mutate(theme_word, self.rng)
-            if candidate != theme_word:
-                return candidate, True
-        return theme_word, False
-
-    def _build(
-        self,
-        theme: WordList,
-        pattern: Pattern,
-        mutation_chance: float,
-    ) -> Suggestion:
-        # Theme-eigene Modifier-Pools haben Vorrang vor den globalen Listen.
+    def generate_recipes(self, theme_slug: str, count: int = 30) -> list[Recipe]:
+        """Erzeugt `count` zufaellige Recipes - jedes Theme-Wort nur einmal."""
+        if theme_slug not in self.themes:
+            raise KeyError(f"Unknown theme: {theme_slug}")
+        theme = self.themes[theme_slug]
         adjectives = theme.adjectives or self.modifiers["adjectives"].words
         verbs = theme.verbs or self.modifiers["verbs"].words
-        theme_word = self._pick(theme.words)
-        # Ohne Modifier waere eine nicht-mutierte Suggestion identisch mit dem
-        # Quellwort - dann zwingend mutieren, ausser das Theme erlaubt nackte
-        # Woerter (bare). Bei mutate=False findet ueberhaupt keine Mutation statt.
-        force_mutation = pattern is Pattern.THEME_ONLY and not theme.bare
-        want_mutation = theme.mutate and (
-            force_mutation or self.rng.random() < mutation_chance
-        )
-        rendered_theme, mutated = self._render_theme_word(theme_word, want_mutation)
+        recipes: list[Recipe] = []
+        seen: set[str] = set()
+        attempts = 0
+        max_attempts = count * 40
+        while len(recipes) < count and attempts < max_attempts:
+            attempts += 1
+            theme_word = self.rng.choice(theme.words)
+            key = theme_word.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            recipes.append(
+                Recipe(
+                    theme_word=theme_word,
+                    adjective=self.rng.choice(adjectives),
+                    verb=self.rng.choice(verbs),
+                    pattern_index=self.rng.randrange(3),
+                    mutation_roll=self.rng.random(),
+                    mutation_seed=self.rng.randrange(_SEED_CEILING),
+                )
+            )
+        return recipes
 
-        # source_words[0] ist immer das Theme-Wort, danach folgen Modifier.
+    @staticmethod
+    def _pattern_pool(theme: WordList, word_count: int) -> tuple[Pattern, ...]:
+        """Bestimmt die erlaubten Patterns - Theme-eigene haben Vorrang."""
+        if theme.patterns:
+            declared = _patterns_from_strings(theme.patterns)
+            if declared:
+                return declared
+        if word_count <= 1:
+            return (Pattern.THEME_ONLY,)
+        if word_count >= 3:
+            return (Pattern.ADJ_THEME_VERB,)
+        return _TWO_WORD_PATTERNS
+
+    def render(
+        self,
+        recipe: Recipe,
+        theme: WordList,
+        word_count: int = 2,
+        mutation_chance: float = 0.35,
+    ) -> Suggestion:
+        """Macht aus einem Recipe eine konkrete Suggestion fuer die aktuellen
+        Mutation-/Wortzahl-Einstellungen."""
+        pool = self._pattern_pool(theme, word_count)
+        pattern = pool[recipe.pattern_index % len(pool)]
+
+        rendered = recipe.theme_word
+        mutated = False
+        if theme.mutate and recipe.mutation_roll < mutation_chance:
+            seeded = random.Random(recipe.mutation_seed)
+            for _ in range(_MUTATION_RETRIES):
+                candidate = mutate(recipe.theme_word, seeded)
+                if candidate != recipe.theme_word:
+                    rendered, mutated = candidate, True
+                    break
+
         sources: tuple[str, ...]
         match pattern:
             case Pattern.ADJ_THEME:
-                modifier = self._pick(adjectives)
-                name = f"{modifier} {rendered_theme}"
-                sources = (theme_word, modifier)
+                name = f"{recipe.adjective} {rendered}"
+                sources = (recipe.theme_word, recipe.adjective)
             case Pattern.VERB_THEME:
-                modifier = self._pick(verbs)
-                name = f"{modifier} {rendered_theme}"
-                sources = (theme_word, modifier)
+                name = f"{recipe.verb} {rendered}"
+                sources = (recipe.theme_word, recipe.verb)
             case Pattern.THEME_VERB:
-                modifier = self._pick(verbs)
-                name = f"{rendered_theme} {modifier}"
-                sources = (theme_word, modifier)
+                name = f"{rendered} {recipe.verb}"
+                sources = (recipe.theme_word, recipe.verb)
             case Pattern.THEME_ONLY:
-                name = rendered_theme
-                sources = (theme_word,)
+                name = rendered
+                sources = (recipe.theme_word,)
             case Pattern.ADJ_THEME_VERB:
-                adjective = self._pick(adjectives)
-                verb = self._pick(verbs)
-                name = f"{adjective} {rendered_theme} {verb}"
-                sources = (theme_word, adjective, verb)
+                name = f"{recipe.adjective} {rendered} {recipe.verb}"
+                sources = (recipe.theme_word, recipe.adjective, recipe.verb)
 
         return Suggestion(
             name=name.title(),
@@ -158,60 +201,12 @@ class Generator:
         theme_slug: str,
         count: int = 10,
         mutation_chance: float = 0.35,
-        patterns: tuple[Pattern, ...] | None = None,
         word_count: int = 2,
     ) -> list[Suggestion]:
-        """Generiere `count` Codenamen-Vorschlaege fuer ein Theme.
+        """Einmalige Generierung: Recipes erzeugen und direkt rendern.
 
-        Wenn mutation_chance == 1.0, werden nur Vorschlaege akzeptiert, deren
-        Theme-Wort tatsaechlich phonetisch mutiert wurde. `word_count` legt die
-        exakte Anzahl der Namens-Komponenten fest (1..3).
+        `word_count` legt die exakte Anzahl der Namens-Komponenten fest (1..3).
         """
-        if theme_slug not in self.themes:
-            raise KeyError(f"Unknown theme: {theme_slug}")
+        recipes = self.generate_recipes(theme_slug, count)
         theme = self.themes[theme_slug]
-        # Theme-eigene Patterns haben Vorrang und ignorieren die Wortzahl.
-        if theme.patterns:
-            pool = _patterns_from_strings(theme.patterns)
-        else:
-            pool = patterns or tuple(Pattern)
-            pool = tuple(p for p in pool if PATTERN_WORD_COUNT[p] == word_count)
-        # Bei 0% Mutation den THEME_ONLY-Pattern weglassen - er wuerde sonst
-        # trotzdem ein mutiertes Wort erzeugen (sein Force-Mutation-Pfad).
-        # Ausnahme: Themes die nackte Woerter erlauben (bare).
-        if mutation_chance <= 0.0 and not theme.bare:
-            pool = tuple(p for p in pool if p is not Pattern.THEME_ONLY)
-        if not pool:
-            return []
-        seen_slugs: set[str] = set()
-        seen_theme_words: set[str] = set()
-        result: list[Suggestion] = []
-        require_mutation = mutation_chance >= 1.0 and theme.mutate
-        attempts = 0
-        max_attempts = count * 40
-        while len(result) < count and attempts < max_attempts:
-            attempts += 1
-            pattern = self.rng.choice(pool)
-            suggestion = self._build(theme, pattern, mutation_chance)
-            if suggestion.slug in seen_slugs:
-                continue
-            if require_mutation and not suggestion.mutated:
-                continue
-            # Nacktes Quellwort ohne Modifier und ohne Mutation nur erlaubt,
-            # wenn das Theme nackte Woerter explizit zulaesst (bare).
-            if (
-                not theme.bare
-                and pattern is Pattern.THEME_ONLY
-                and not suggestion.mutated
-            ):
-                continue
-            # Jedes Quellwort des Themes darf nur einmal vorkommen -
-            # sonst tauchen mehrere Mutationen desselben Wortes auf
-            # (z.B. "Forrego" und "Foreggo" aus "Forego").
-            theme_word = suggestion.source_words[0].lower()
-            if theme_word in seen_theme_words:
-                continue
-            seen_slugs.add(suggestion.slug)
-            seen_theme_words.add(theme_word)
-            result.append(suggestion)
-        return result
+        return [self.render(r, theme, word_count, mutation_chance) for r in recipes]

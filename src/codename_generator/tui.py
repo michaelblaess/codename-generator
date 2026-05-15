@@ -15,7 +15,13 @@ from textual_themes import register_all
 from textual_widgets import HorizontalSplitter, VerticalSplitter
 
 from codename_generator import __author__, __version__, __year__
-from codename_generator.generator import RANDOM_THEME_SLUG, Generator, Pattern, Suggestion
+from codename_generator.generator import (
+    RANDOM_THEME_SLUG,
+    Generator,
+    Pattern,
+    Recipe,
+    Suggestion,
+)
 from codename_generator.settings import JsonSettingsStore
 
 _DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
@@ -245,6 +251,8 @@ class CodenameApp(App[None]):
         self.theme_slugs = list(self.generator.themes.keys())
         self.theme_slug = self.theme_slugs[0] if self.theme_slugs else ""
         self.suggestions: list[Suggestion] = []
+        # Recipes pro Theme - bleiben erhalten bis "r" neue erzeugt.
+        self._recipes: dict[str, list[Recipe]] = {}
 
         settings = self._settings_store.load()
         self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
@@ -384,7 +392,8 @@ class CodenameApp(App[None]):
         list_view = self.query_one("#theme-list", ListView)
         list_view.index = 0
         self._log_event(f"started - theme [b]{self.theme_slug}[/b]")
-        self._regenerate()
+        self._ensure_recipes()
+        self._rerender()
 
     def _log_event(self, message: str) -> None:
         try:
@@ -424,16 +433,34 @@ class CodenameApp(App[None]):
             else f"Words: [b]{self.word_count}[/b]"
         )
 
-    def _regenerate(self) -> None:
+    def _ensure_recipes(self) -> None:
+        """Erzeugt Recipes fuer das aktuelle Theme, falls noch keine im Cache."""
+        if self.theme_slug and self.theme_slug not in self._recipes:
+            self._recipes[self.theme_slug] = self.generator.generate_recipes(
+                self.theme_slug, count=30
+            )
+
+    def _fresh_recipes(self) -> None:
+        """Verwirft die Recipes des aktuellen Themes und erzeugt neue."""
+        if self.theme_slug:
+            self._recipes[self.theme_slug] = self.generator.generate_recipes(
+                self.theme_slug, count=30
+            )
+
+    def _rerender(self) -> None:
+        """Rendert die vorhandenen Recipes mit aktueller Mutation/Wortzahl neu.
+
+        Erzeugt KEINE neuen Recipes - die Grundzutaten bleiben stabil, nur die
+        Darstellung (Mutation, Wortzahl) aendert sich.
+        """
         if not self.theme_slug:
             return
+        theme = self.generator.themes[self.theme_slug]
         mutation = self.mutation_percent / 100.0
-        self.suggestions = self.generator.suggest(
-            theme_slug=self.theme_slug,
-            count=30,
-            mutation_chance=mutation,
-            word_count=self.word_count,
-        )
+        recipes = self._recipes.get(self.theme_slug, [])
+        self.suggestions = [
+            self.generator.render(r, theme, self.word_count, mutation) for r in recipes
+        ]
         table = self.query_one("#suggestions", DataTable)
         table.clear()
         for i, s in enumerate(self.suggestions, 1):
@@ -472,7 +499,9 @@ class CodenameApp(App[None]):
             self.sub_title = slug
             self._apply_theme_default_mutation()
             self._log_event(f"theme -> [b]{slug}[/b]")
-            self._regenerate()
+            # Vorhandene Recipes des Themes bleiben erhalten (Cache).
+            self._ensure_recipes()
+            self._rerender()
 
     def _apply_theme_default_mutation(self) -> None:
         """Setzt die Mutation auf den Theme-Default beim Wechsel (falls deklariert)."""
@@ -487,8 +516,9 @@ class CodenameApp(App[None]):
         self._save_settings()
 
     def action_regenerate(self) -> None:
+        self._fresh_recipes()
         self._log_event("regenerated")
-        self._regenerate()
+        self._rerender()
 
     def action_copy_slug(self) -> None:
         s = self._selected_suggestion()
@@ -525,7 +555,7 @@ class CodenameApp(App[None]):
         slider.value = new_value
         self._log_event(f"mutation -> [b]{new_value}%[/b]")
         self._save_settings()
-        self._regenerate()
+        self._rerender()
 
     def on_slider_changed(self, event: Slider.Changed) -> None:
         new_value = int(event.value)
@@ -542,7 +572,7 @@ class CodenameApp(App[None]):
         else:
             return
         self._save_settings()
-        self._regenerate()
+        self._rerender()
 
     def action_cycle_theme(self) -> None:
         themes = sorted(self.available_themes)
