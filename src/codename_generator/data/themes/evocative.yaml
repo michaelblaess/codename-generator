@@ -2,7 +2,7 @@ name: Evocative
 description: A stark adjective paired with an emotionally charged noun
 patterns:
   - adj-theme
-mutate: false
+default_mutation: 0
 adjectives:
   - Dark
   - Cold

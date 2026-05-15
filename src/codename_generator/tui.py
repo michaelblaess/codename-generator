@@ -233,7 +233,7 @@ class CodenameApp(App[None]):
 
     MUTATION_DEFAULT: ClassVar[int] = 35
     MUTATION_BUMP: ClassVar[int] = 25
-    MAX_WORDS_DEFAULT: ClassVar[int] = 3
+    WORD_COUNT_DEFAULT: ClassVar[int] = 2
     DEFAULT_THEME: ClassVar[str] = "textual-dark"
 
     def __init__(self) -> None:
@@ -248,7 +248,7 @@ class CodenameApp(App[None]):
 
         settings = self._settings_store.load()
         self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
-        self.max_words = self._coerce_words(settings.get("max_words"))
+        self.word_count = self._coerce_words(settings.get("word_count"))
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
@@ -265,11 +265,11 @@ class CodenameApp(App[None]):
     @staticmethod
     def _coerce_words(raw: object) -> int:
         if not isinstance(raw, (int, float, str)):
-            return CodenameApp.MAX_WORDS_DEFAULT
+            return CodenameApp.WORD_COUNT_DEFAULT
         try:
             value = int(raw)
         except (TypeError, ValueError):
-            return CodenameApp.MAX_WORDS_DEFAULT
+            return CodenameApp.WORD_COUNT_DEFAULT
         return max(1, min(3, value))
 
     @staticmethod
@@ -311,7 +311,7 @@ class CodenameApp(App[None]):
             {
                 "theme": self.theme,
                 "mutation_percent": self.mutation_percent,
-                "max_words": self.max_words,
+                "word_count": self.word_count,
                 "favorites": self._serialize_favorites(),
             }
         )
@@ -324,21 +324,23 @@ class CodenameApp(App[None]):
             return
         self._save_settings()
 
+    def _theme_items(self) -> list[ListItem]:
+        """Baut die Theme-Listeneintraege - Beschreibung als Hover-Tooltip."""
+        items: list[ListItem] = []
+        for slug in self.theme_slugs:
+            theme = self.generator.themes[slug]
+            item = ListItem(Static(theme.name), id=f"theme-{slug}")
+            if theme.description:
+                item.tooltip = theme.description
+            items.append(item)
+        return items
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Horizontal(id="main"):
             with Vertical(id="themes-pane"):
                 yield Static("[b]Themes[/b]")
-                yield ListView(
-                    *[
-                        ListItem(
-                            Static(self.generator.themes[s].name),
-                            id=f"theme-{s}",
-                        )
-                        for s in self.theme_slugs
-                    ],
-                    id="theme-list",
-                )
+                yield ListView(*self._theme_items(), id="theme-list")
                 yield HorizontalSplitter(target_id="theme-list", min_size=6)
                 with Vertical(id="settings-pane"):
                     yield Static("Settings", id="settings-title")
@@ -356,7 +358,7 @@ class CodenameApp(App[None]):
                         min=1,
                         max=3,
                         step=1,
-                        value=self.max_words,
+                        value=self.word_count,
                         id="wordcount-slider",
                         classes="settings-slider",
                     )
@@ -396,8 +398,7 @@ class CodenameApp(App[None]):
         theme = self.generator.themes[self.theme_slug]
         info = self.query_one("#info", Static)
         info.update(
-            f"[b]{theme.name}[/b]   "
-            f"theme: [b]{self.theme}[/b]   "
+            f"[b]{theme.name}[/b]  [dim]{theme.description}[/dim]   "
             f"favorites: [b]{len(self.favorites)}[/b]"
         )
 
@@ -420,7 +421,7 @@ class CodenameApp(App[None]):
         wc_label.update(
             "Words: [b]locked by theme[/b]"
             if words_locked
-            else f"Words: max [b]{self.max_words}[/b]"
+            else f"Words: [b]{self.word_count}[/b]"
         )
 
     def _regenerate(self) -> None:
@@ -431,7 +432,7 @@ class CodenameApp(App[None]):
             theme_slug=self.theme_slug,
             count=30,
             mutation_chance=mutation,
-            max_words=self.max_words,
+            word_count=self.word_count,
         )
         table = self.query_one("#suggestions", DataTable)
         table.clear()
@@ -469,8 +470,21 @@ class CodenameApp(App[None]):
         if slug in self.generator.themes and slug != self.theme_slug:
             self.theme_slug = slug
             self.sub_title = slug
+            self._apply_theme_default_mutation()
             self._log_event(f"theme -> [b]{slug}[/b]")
             self._regenerate()
+
+    def _apply_theme_default_mutation(self) -> None:
+        """Setzt die Mutation auf den Theme-Default beim Wechsel (falls deklariert)."""
+        theme = self.generator.themes[self.theme_slug]
+        if theme.default_mutation is None:
+            return
+        value = max(0, min(100, theme.default_mutation - (theme.default_mutation % 5)))
+        if value == self.mutation_percent:
+            return
+        self.mutation_percent = value
+        self.query_one("#mutation-slider", Slider).value = value
+        self._save_settings()
 
     def action_regenerate(self) -> None:
         self._log_event("regenerated")
@@ -521,10 +535,10 @@ class CodenameApp(App[None]):
             self.mutation_percent = new_value
             self._log_event(f"mutation -> [b]{new_value}%[/b]")
         elif event.slider.id == "wordcount-slider":
-            if new_value == self.max_words:
+            if new_value == self.word_count:
                 return
-            self.max_words = new_value
-            self._log_event(f"max words -> [b]{new_value}[/b]")
+            self.word_count = new_value
+            self._log_event(f"word count -> [b]{new_value}[/b]")
         else:
             return
         self._save_settings()

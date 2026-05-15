@@ -1,28 +1,34 @@
 from __future__ import annotations
 
 from codename_generator.generator import PATTERN_WORD_COUNT, Generator, Pattern
+from codename_generator.wordlist import WordList
 
 
-def test_max_words_one_yields_only_single_component() -> None:
+def test_word_count_one_yields_only_single_component() -> None:
     gen = Generator.load(seed=3)
-    suggestions = gen.suggest("greek-gods", count=20, mutation_chance=0.6, max_words=1)
+    suggestions = gen.suggest("greek-gods", count=20, mutation_chance=0.6, word_count=1)
     assert suggestions
     for s in suggestions:
-        assert s.pattern is Pattern.THEME_ONLY, f"max_words=1 must be theme-only: {s}"
+        assert PATTERN_WORD_COUNT[s.pattern] == 1, f"word_count=1 must be 1 word: {s}"
 
 
-def test_max_words_two_excludes_three_word_pattern() -> None:
+def test_word_count_two_yields_exactly_two_components() -> None:
+    """word_count=2 -> ausschliesslich 2-Komponenten-Namen, keine 1- oder 3-Wort."""
     gen = Generator.load(seed=3)
-    suggestions = gen.suggest("flowers", count=30, mutation_chance=0.5, max_words=2)
+    suggestions = gen.suggest("flowers", count=30, mutation_chance=0.5, word_count=2)
+    assert suggestions
     for s in suggestions:
-        assert PATTERN_WORD_COUNT[s.pattern] <= 2, f"too many words: {s}"
+        assert PATTERN_WORD_COUNT[s.pattern] == 2, f"expected exactly 2 words: {s}"
 
 
-def test_max_words_three_allows_adj_theme_verb() -> None:
+def test_word_count_three_yields_exactly_three_components() -> None:
+    """word_count=3 -> ausschliesslich 3-Wort-Namen (adj-theme-verb)."""
     gen = Generator.load(seed=3)
-    suggestions = gen.suggest("flowers", count=60, mutation_chance=0.5, max_words=3)
-    patterns = {s.pattern for s in suggestions}
-    assert Pattern.ADJ_THEME_VERB in patterns
+    suggestions = gen.suggest("flowers", count=30, mutation_chance=0.5, word_count=3)
+    assert suggestions
+    for s in suggestions:
+        assert PATTERN_WORD_COUNT[s.pattern] == 3, f"expected exactly 3 words: {s}"
+        assert s.pattern is Pattern.ADJ_THEME_VERB
 
 
 def test_load_generator() -> None:
@@ -110,6 +116,15 @@ def test_source_words_normalized_theme_first() -> None:
         )
 
 
+def test_evocative_and_power_words_default_to_zero_mutation() -> None:
+    """Beide Themes erlauben Mutation, starten aber per Default bei 0%."""
+    gen = Generator.load(seed=4)
+    for slug in ("evocative", "power-words"):
+        theme = gen.themes[slug]
+        assert theme.mutate is True, f"{slug} should allow mutation"
+        assert theme.default_mutation == 0, f"{slug} default_mutation should be 0"
+
+
 def test_bare_theme_emits_unmutated_words() -> None:
     """power-words ist bare - nackte Einzelwoerter sind erlaubt, auch bei 0%."""
     gen = Generator.load(seed=4)
@@ -121,10 +136,17 @@ def test_bare_theme_emits_unmutated_words() -> None:
         assert s.name in theme_words, f"bare theme word expected: {s}"
 
 
-def test_mutate_false_theme_never_mutates() -> None:
-    """evocative hat mutate=false - kein Vorschlag darf mutiert sein."""
+def test_mutate_false_disables_mutation() -> None:
+    """Ein Theme mit mutate=False mutiert nie, auch bei mutation_chance=1.0."""
     gen = Generator.load(seed=4)
-    suggestions = gen.suggest("evocative", count=30, mutation_chance=1.0)
+    gen.themes["_mutate_test"] = WordList(
+        slug="_mutate_test",
+        name="Test",
+        description="",
+        words=("Pegasus", "Apollo", "Hermes", "Cerberus", "Hydra"),
+        mutate=False,
+    )
+    suggestions = gen.suggest("_mutate_test", count=15, mutation_chance=1.0)
     assert suggestions
     assert all(not s.mutated for s in suggestions)
 
@@ -132,7 +154,8 @@ def test_mutate_false_theme_never_mutates() -> None:
 def test_theme_pattern_override_restricts_pool() -> None:
     """evocative deklariert patterns=[adj-theme] - nur dieses Pattern kommt vor."""
     gen = Generator.load(seed=4)
-    suggestions = gen.suggest("evocative", count=30, mutation_chance=0.5, max_words=1)
+    # word_count wird ignoriert, weil das Theme eigene patterns deklariert.
+    suggestions = gen.suggest("evocative", count=30, mutation_chance=0.5, word_count=1)
     assert suggestions
     assert all(s.pattern is Pattern.ADJ_THEME for s in suggestions)
 

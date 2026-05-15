@@ -1,9 +1,9 @@
 name: Power Words
-description: Single bold standalone words - no modifiers, no mutation
+description: Single bold standalone words - no modifiers, mutation off by default
 patterns:
   - theme
 bare: true
-mutate: false
+default_mutation: 0
 words:
   - Mythos
   - Skyline
@@ -55,3 +55,55 @@ words:
   - Halcyon
   - Equinox
   - Meridian
+  - Anthem
+  - Atlas
+  - Avalanche
+  - Axiom
+  - Bedrock
+  - Blueprint
+  - Cobalt
+  - Comet
+  - Cortex
+  - Crest
+  - Dynamo
+  - Enigma
+  - Falcon
+  - Fathom
+  - Fortress
+  - Gravity
+  - Harbor
+  - Inferno
+  - Juggernaut
+  - Lighthouse
+  - Mandate
+  - Mantle
+  - Mirage
+  - Nimbus
+  - Northstar
+  - Orbit
+  - Pioneer
+  - Polaris
+  - Quasar
+  - Rampart
+  - Reactor
+  - Relic
+  - Riptide
+  - Sentinel
+  - Sovereign
+  - Talisman
+  - Threshold
+  - Totem
+  - Valor
+  - Vigil
+  - Voyager
+  - Zephyr
+  - Cinder
+  - Ironclad
+  - Spire
+  - Landmark
+  - Watchtower
+  - Wavelength
+  - Wildfire
+  - Lattice
+  - Bulwark
+  - Cornerstone
