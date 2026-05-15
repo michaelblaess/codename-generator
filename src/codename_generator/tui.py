@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import ClassVar
 
-import pyperclip
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -524,25 +523,19 @@ class CodenameApp(App[None]):
         s = self._selected_suggestion()
         if s is None:
             return
-        try:
-            pyperclip.copy(s.slug)
-            self.notify(f"Copied slug: {s.slug}", timeout=2)
-            self._log_event(f"copied slug [b]{s.slug}[/b]")
-        except pyperclip.PyperclipException as exc:
-            self.notify(f"Clipboard error: {exc}", severity="error")
-            self._log_event(f"[red]clipboard error: {exc}[/red]")
+        # copy_to_clipboard reicht den Befehl ans Terminal bzw. den Browser
+        # durch - funktioniert lokal, ueber SSH und web-gehostet (textual-web).
+        self.copy_to_clipboard(s.slug)
+        self.notify(f"Copied slug: {s.slug}", timeout=2)
+        self._log_event(f"copied slug [b]{s.slug}[/b]")
 
     def action_copy_name(self) -> None:
         s = self._selected_suggestion()
         if s is None:
             return
-        try:
-            pyperclip.copy(s.name)
-            self.notify(f"Copied name: {s.name}", timeout=2)
-            self._log_event(f"copied name [b]{s.name}[/b]")
-        except pyperclip.PyperclipException as exc:
-            self.notify(f"Clipboard error: {exc}", severity="error")
-            self._log_event(f"[red]clipboard error: {exc}[/red]")
+        self.copy_to_clipboard(s.name)
+        self.notify(f"Copied name: {s.name}", timeout=2)
+        self._log_event(f"copied name [b]{s.name}[/b]")
 
     def action_bump_mutation(self) -> None:
         if not self.generator.themes[self.theme_slug].mutate:
