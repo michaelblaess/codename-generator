@@ -31,8 +31,8 @@ Two themes use their own curated word pools:
   (`Mythos`, `Skyline`, `Oracle`, `Aegis`).
 
 A theme YAML can override the global modifier pools (`adjectives`, `verbs`),
-restrict `patterns`, allow bare unmutated words (`bare: true`) or disable
-mutation (`mutate: false`).
+restrict the name `patterns`, disable mutation (`mutate: false`) or set the
+mutation level it starts at (`default_mutation`).
 
 ## Setup
 
