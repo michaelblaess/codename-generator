@@ -17,21 +17,21 @@
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Themes](https://img.shields.io/badge/themes-18-yellow)](src/codename_generator/data/themes)
 
-Ein Codename-Generator fuer das Terminal. Waehle ein Thema (griechische Goetter, Rennpferde, Edelsteine, Whisky, ...) und erhalte einen Stapel einzigartiger Vorschlaege (10 bis 40, frei waehlbar), kombiniert mit Adjektiv- oder Verb-Modifikatoren und optionalen phonetischen Mutationen.
+Ein Codename-Generator für das Terminal. Wähle ein Thema (griechische Götter, Rennpferde, Edelsteine, Whisky, ...) und erhalte einen Stapel einzigartiger Vorschläge (10 bis 40, frei wählbar), kombiniert mit Adjektiv- oder Verb-Modifikatoren und optionalen phonetischen Mutationen.
 
 ## Themen
 
-Griechische Goetter · Aegyptische Goetter · Nordische Goetter · Sternbilder · Tierkreiszeichen · Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Dev · Random (gepoolt)
+Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Dev · Random (gepoolt)
 
 Zwei Themen nutzen ihre eigenen kuratierten Wort-Pools:
 
 - **Evocative** - ein markantes Adjektiv + ein emotional aufgeladenes Substantiv
   (`Cold Ember`, `Iron Hour`, `Sacred Tide`). Wird nie mutiert.
-- **Power words** - einzelne, kraftvolle, eigenstaendige Woerter, keine Modifikatoren
+- **Power words** - einzelne, kraftvolle, eigenständige Wörter, keine Modifikatoren
   (`Mythos`, `Skyline`, `Oracle`, `Aegis`).
 
 Ein Theme-YAML kann die globalen Modifikator-Pools (`adjectives`, `verbs`)
-ueberschreiben, die Namens-`patterns` einschraenken, die Mutation deaktivieren
+überschreiben, die Namens-`patterns` einschränken, die Mutation deaktivieren
 (`mutate: false`) oder den Start-Mutationswert setzen (`default_mutation`).
 
 ## Einrichtung
@@ -41,7 +41,7 @@ setup.bat        # Windows
 ./setup.sh       # macOS/Linux
 ```
 
-Benoetigt [uv](https://docs.astral.sh/uv/).
+Benötigt [uv](https://docs.astral.sh/uv/).
 
 ## Verwendung
 
@@ -56,20 +56,20 @@ uv run codename  # jede Plattform
 Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `a` Info · `q` beenden
 
 Das linke Einstellungspanel hat drei Schieberegler: **Mutationswahrscheinlichkeit**
-(0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Woerter pro Name) und
-**Vorschlaege** (10/20/30/40 Namen pro Stapel). Das Verschieben eines Reglers
+(0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Wörter pro Name) und
+**Vorschläge** (10/20/30/40 Namen pro Stapel). Das Verschieben eines Reglers
 rendert den *aktuellen* Satz von Namen direkt neu, sodass du den Effekt sofort
-siehst — nur `r` zieht einen frischen Stapel. Jedes Thema behaelt seinen
+siehst — nur `r` zieht einen frischen Stapel. Jedes Thema behält seinen
 eigenen Satz, sodass das Hin- und Herwechseln zwischen Themen nie verliert, was
-du hattest. Bewege den Mauszeiger ueber ein Thema in der Liste fuer einen
-Tooltip mit Beschreibung. Rechtsklick auf einen Vorschlag oeffnet ein
-Kontextmenue (Slug/Name kopieren, Favorit, neu generieren). Die Theme-Liste
-beginnt mit einem **Favorites**-Eintrag — waehlst du ihn, erscheinen rechts
+du hattest. Bewege den Mauszeiger über ein Thema in der Liste für einen
+Tooltip mit Beschreibung. Rechtsklick auf einen Vorschlag öffnet ein
+Kontextmenü (Slug/Name kopieren, Favorit, neu generieren). Die Theme-Liste
+beginnt mit einem **Favorites**-Eintrag — wählst du ihn, erscheinen rechts
 deine gespeicherten Favoriten, wo nur der Mutations-Regler wirkt und sie live
 neu mutiert. Wird mit 35+ Farb-Themes ausgeliefert (Textual-Builtins plus
-Retro-Paletten) — wechseln mit `t` oder dem Ctrl+P-Theme-Picker. Gewaehltes
+Retro-Paletten) — wechseln mit `t` oder dem Ctrl+P-Theme-Picker. Gewähltes
 Farb-Theme, Mutationswahrscheinlichkeit, Wortanzahl, Vorschlagsanzahl und
-Favoriten werden in `~/.codename-generator/settings.json` ueber Neustarts
+Favoriten werden in `~/.codename-generator/settings.json` über Neustarts
 hinweg gespeichert.
 
 ### CLI
@@ -85,7 +85,7 @@ uv run codename -t whisky --words 3     # exactly 3 components per name
 Ein `*` neben einem Vorschlag bedeutet, dass eine phonetische Mutation angewendet wurde
 (`Pegasus -> Pegasos`, `Carnation -> Carnatiyn`, `Frankel -> Frankil`).
 
-## Themen hinzufuegen
+## Themen hinzufügen
 
 Lege eine YAML-Datei in `src/codename_generator/data/themes/` ab:
 
@@ -100,7 +100,7 @@ words:
 ## Danksagung
 
 Die Einstellungs-Schieberegler nutzen [textual-slider](https://github.com/TomJGooding/textual-slider)
-von [Tom J Gooding](https://github.com/TomJGooding) - danke fuer das Widget.
+von [Tom J Gooding](https://github.com/TomJGooding) - danke für das Widget.
 
 ## Lizenz
 
