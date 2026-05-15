@@ -15,13 +15,13 @@
 [![CI](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Themes](https://img.shields.io/badge/themes-17-yellow)](src/codename_generator/data/themes)
+[![Themes](https://img.shields.io/badge/themes-18-yellow)](src/codename_generator/data/themes)
 
-A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, whisky, ...), get 30 unique suggestions combined with adjective or verb modifiers and optional phonetic mutations.
+A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, whisky, ...), get a batch of unique suggestions (10 to 40, your pick) combined with adjective or verb modifiers and optional phonetic mutations.
 
 ## Themes
 
-Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Dev · Random (pooled)
+Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Dev · Random (pooled)
 
 Two themes use their own curated word pools:
 
@@ -55,15 +55,20 @@ uv run codename  # any platform
 
 Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `a` about · `q` quit
 
-The left settings panel has two sliders: **mutation chance** (0-100%) and
-**word count** (exactly 1, 2 or 3 components per name). Moving a slider
-re-renders the *current* set of names in place so you see the effect
-immediately — only `r` draws a fresh batch. Each theme keeps its own set, so
-switching themes back and forth never loses what you had. Hover a theme in the
-list for a tooltip describing it. Ships with 35+ themes (Textual built-ins
-plus retro palettes) — switch with `t` or the Ctrl+P theme picker. Chosen
-theme, mutation chance, word count and favorites are persisted to
-`~/.codename-generator/settings.json` across restarts.
+The left settings panel has three sliders: **mutation chance** (0-100%),
+**word count** (1, 2 or 3 visible words per name) and **suggestions**
+(10/20/30/40 names per batch). Moving a slider re-renders the *current* set of
+names in place so you see the effect immediately — only `r` draws a fresh
+batch. Each theme keeps its own set, so switching themes back and forth never
+loses what you had. Hover a theme in the list for a tooltip describing it.
+Right-click any suggestion for a context menu (copy slug/name, favorite,
+regenerate). The theme list starts with a **Favorites** entry — selecting it
+lists your saved favorites on the right, where only the mutation slider
+applies and re-mutates them live. Ships with 35+ colour themes (Textual
+built-ins plus retro palettes) — switch with `t` or the Ctrl+P theme picker.
+Chosen colour theme, mutation chance, word count, suggestion count and
+favorites are persisted to `~/.codename-generator/settings.json` across
+restarts.
 
 ### CLI
 

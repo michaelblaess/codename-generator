@@ -15,13 +15,13 @@
 [![CI](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Themes](https://img.shields.io/badge/themes-17-yellow)](src/codename_generator/data/themes)
+[![Themes](https://img.shields.io/badge/themes-18-yellow)](src/codename_generator/data/themes)
 
-Ein Codename-Generator fuer das Terminal. Waehle ein Thema (griechische Goetter, Rennpferde, Edelsteine, Whisky, ...) und erhalte 30 einzigartige Vorschlaege, kombiniert mit Adjektiv- oder Verb-Modifikatoren und optionalen phonetischen Mutationen.
+Ein Codename-Generator fuer das Terminal. Waehle ein Thema (griechische Goetter, Rennpferde, Edelsteine, Whisky, ...) und erhalte einen Stapel einzigartiger Vorschlaege (10 bis 40, frei waehlbar), kombiniert mit Adjektiv- oder Verb-Modifikatoren und optionalen phonetischen Mutationen.
 
 ## Themen
 
-Griechische Goetter · Aegyptische Goetter · Nordische Goetter · Sternbilder · Tierkreiszeichen · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Dev · Random (gepoolt)
+Griechische Goetter · Aegyptische Goetter · Nordische Goetter · Sternbilder · Tierkreiszeichen · Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Dev · Random (gepoolt)
 
 Zwei Themen nutzen ihre eigenen kuratierten Wort-Pools:
 
@@ -55,15 +55,22 @@ uv run codename  # jede Plattform
 
 Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `a` Info · `q` beenden
 
-Das linke Einstellungspanel hat zwei Schieberegler: **Mutationswahrscheinlichkeit** (0-100%) und
-**Wortanzahl** (genau 1, 2 oder 3 Komponenten pro Name). Das Verschieben eines Reglers
-rendert den *aktuellen* Satz von Namen direkt neu, sodass du den Effekt
-sofort siehst — nur `r` zieht einen frischen Stapel. Jedes Thema behaelt seinen eigenen Satz, sodass
-das Hin- und Herwechseln zwischen Themen nie verliert, was du hattest. Bewege den Mauszeiger ueber ein Thema in der
-Liste fuer einen Tooltip mit Beschreibung. Wird mit 35+ Themen ausgeliefert (Textual-Builtins
-plus Retro-Paletten) — wechseln mit `t` oder dem Ctrl+P-Theme-Picker. Gewaehltes
-Thema, Mutationswahrscheinlichkeit, Wortanzahl und Favoriten werden in
-`~/.codename-generator/settings.json` ueber Neustarts hinweg gespeichert.
+Das linke Einstellungspanel hat drei Schieberegler: **Mutationswahrscheinlichkeit**
+(0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Woerter pro Name) und
+**Vorschlaege** (10/20/30/40 Namen pro Stapel). Das Verschieben eines Reglers
+rendert den *aktuellen* Satz von Namen direkt neu, sodass du den Effekt sofort
+siehst — nur `r` zieht einen frischen Stapel. Jedes Thema behaelt seinen
+eigenen Satz, sodass das Hin- und Herwechseln zwischen Themen nie verliert, was
+du hattest. Bewege den Mauszeiger ueber ein Thema in der Liste fuer einen
+Tooltip mit Beschreibung. Rechtsklick auf einen Vorschlag oeffnet ein
+Kontextmenue (Slug/Name kopieren, Favorit, neu generieren). Die Theme-Liste
+beginnt mit einem **Favorites**-Eintrag — waehlst du ihn, erscheinen rechts
+deine gespeicherten Favoriten, wo nur der Mutations-Regler wirkt und sie live
+neu mutiert. Wird mit 35+ Farb-Themes ausgeliefert (Textual-Builtins plus
+Retro-Paletten) — wechseln mit `t` oder dem Ctrl+P-Theme-Picker. Gewaehltes
+Farb-Theme, Mutationswahrscheinlichkeit, Wortanzahl, Vorschlagsanzahl und
+Favoriten werden in `~/.codename-generator/settings.json` ueber Neustarts
+hinweg gespeichert.
 
 ### CLI
 
