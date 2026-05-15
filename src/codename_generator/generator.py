@@ -136,17 +136,28 @@ class Generator:
         return recipes
 
     @staticmethod
-    def _pattern_pool(theme: WordList, word_count: int) -> tuple[Pattern, ...]:
-        """Bestimmt die erlaubten Patterns - Theme-eigene haben Vorrang."""
+    def _select_pattern(theme: WordList, recipe: Recipe, word_count: int) -> Pattern:
+        """Waehlt das Pattern so, dass der Name `word_count` SICHTBARE Woerter hat.
+
+        Theme-Woerter koennen selbst mehrteilig sein (z.B. "Hoover Dam" = 2
+        Woerter). Damit der Words-Slider die tatsaechliche Wortanzahl steuert,
+        wird die Laenge des Theme-Worts beruecksichtigt: die Zahl der Modifier
+        ergibt sich aus `word_count` minus der Wortzahl des Theme-Worts.
+        """
+        # Theme-eigene Patterns haben Vorrang - der Slider ist dann gesperrt.
         if theme.patterns:
             declared = _patterns_from_strings(theme.patterns)
             if declared:
-                return declared
-        if word_count <= 1:
-            return (Pattern.THEME_ONLY,)
-        if word_count >= 3:
-            return (Pattern.ADJ_THEME_VERB,)
-        return _TWO_WORD_PATTERNS
+                return declared[recipe.pattern_index % len(declared)]
+
+        theme_word_count = len(recipe.theme_word.split())
+        modifiers = word_count - theme_word_count
+        if modifiers <= 0:
+            # Theme-Wort fuellt das Budget bereits aus (oder ueberschreitet es).
+            return Pattern.THEME_ONLY
+        if modifiers == 1:
+            return _TWO_WORD_PATTERNS[recipe.pattern_index % len(_TWO_WORD_PATTERNS)]
+        return Pattern.ADJ_THEME_VERB
 
     def render(
         self,
@@ -157,8 +168,7 @@ class Generator:
     ) -> Suggestion:
         """Macht aus einem Recipe eine konkrete Suggestion fuer die aktuellen
         Mutation-/Wortzahl-Einstellungen."""
-        pool = self._pattern_pool(theme, word_count)
-        pattern = pool[recipe.pattern_index % len(pool)]
+        pattern = self._select_pattern(theme, recipe, word_count)
 
         rendered = recipe.theme_word
         mutated = False
