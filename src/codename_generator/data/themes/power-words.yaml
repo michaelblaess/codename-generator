@@ -1,0 +1,57 @@
+name: Power Words
+description: Single bold standalone words - no modifiers, no mutation
+patterns:
+  - theme
+bare: true
+mutate: false
+words:
+  - Mythos
+  - Skyline
+  - Apex
+  - Vertex
+  - Nexus
+  - Zenith
+  - Pulse
+  - Catalyst
+  - Momentum
+  - Vanguard
+  - Pinnacle
+  - Spectrum
+  - Quantum
+  - Helix
+  - Prism
+  - Phantom
+  - Titan
+  - Aurora
+  - Onyx
+  - Cipher
+  - Vortex
+  - Echo
+  - Flux
+  - Beacon
+  - Forge
+  - Summit
+  - Horizon
+  - Legend
+  - Saga
+  - Epoch
+  - Oracle
+  - Paragon
+  - Maverick
+  - Odyssey
+  - Genesis
+  - Eclipse
+  - Tempest
+  - Cascade
+  - Citadel
+  - Bastion
+  - Empire
+  - Monolith
+  - Obelisk
+  - Keystone
+  - Lodestar
+  - Crucible
+  - Aegis
+  - Halcyon
+  - Equinox
+  - Meridian
