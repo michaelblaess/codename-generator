@@ -8,11 +8,18 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.events import Click
+from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, ListItem, ListView, RichLog, Static
 from textual_slider import Slider
 from textual_themes import register_all
-from textual_widgets import HorizontalSplitter, VerticalSplitter
+from textual_widgets import (
+    ContextMenuItem,
+    ContextMenuScreen,
+    HorizontalSplitter,
+    VerticalSplitter,
+)
 
 from codename_generator import __author__, __version__, __year__
 from codename_generator.generator import (
@@ -25,6 +32,38 @@ from codename_generator.generator import (
 from codename_generator.settings import JsonSettingsStore
 
 _DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
+
+
+class SuggestionsTable(DataTable[str]):
+    """Vorschlags-Tabelle, die bei Rechtsklick eine RightClicked-Message sendet.
+
+    Textuals DataTable stoppt das Click-Event bei jedem Treffer auf eine Zelle
+    (`event.stop()`), sodass ein App-weiter `on_click`-Handler nie ausgeloest
+    wird. Darum faengt diese Unterklasse den Rechtsklick selbst ab, setzt den
+    Cursor auf die getroffene Zeile und meldet sie per Message an die App.
+    """
+
+    class RightClicked(Message):
+        """Meldet einen Rechtsklick auf eine Tabellenzeile an die App."""
+
+        def __init__(self, row: int, screen_x: int, screen_y: int) -> None:
+            super().__init__()
+            self.row = row
+            self.screen_x = screen_x
+            self.screen_y = screen_y
+
+    async def _on_click(self, event: Click) -> None:
+        # button 3 = Rechtsklick (SGR-Maus-Encoding).
+        if event.button == 3:
+            row = event.style.meta.get("row")
+            if isinstance(row, int) and row >= 0:
+                self.move_cursor(row=row)
+                self.post_message(
+                    self.RightClicked(row, event.screen_x, event.screen_y)
+                )
+            event.stop()
+            return
+        await super()._on_click(event)
 
 
 class FavoritesScreen(ModalScreen[None]):
@@ -128,7 +167,7 @@ class AboutScreen(ModalScreen[None]):
         text.append("Themes  ", style="dim")
         text.append(
             "Greek/Egyptian/Norse Gods · Constellations · "
-            "Racehorses · Flowers · Gemstones · Wines · Whisky · "
+            "Animals · Racehorses · Flowers · Gemstones · Wines · Whisky · "
             "Mountains · Mushrooms · Ships · Landmarks · Random\n\n"
         )
 
@@ -151,6 +190,9 @@ class AboutScreen(ModalScreen[None]):
         text.append("about  ")
         text.append("q ", style="bold")
         text.append("quit\n\n")
+
+        text.append("Mouse   ", style="dim")
+        text.append("right-click a suggestion for a context menu\n\n")
 
         text.append("-" * 48 + "\n\n", style="dim")
 
@@ -192,8 +234,12 @@ class CodenameApp(App[None]):
     #theme-list {
         height: 1fr;
     }
+    #fav-theme Static {
+        color: $warning;
+        text-style: bold;
+    }
     #settings-pane {
-        height: 15;
+        height: auto;
         padding: 1 2;
         background: $boost;
     }
@@ -240,7 +286,10 @@ class CodenameApp(App[None]):
     MUTATION_DEFAULT: ClassVar[int] = 35
     MUTATION_BUMP: ClassVar[int] = 25
     WORD_COUNT_DEFAULT: ClassVar[int] = 2
+    SUGGESTION_COUNT_DEFAULT: ClassVar[int] = 30
     DEFAULT_THEME: ClassVar[str] = "textual-dark"
+    # ListItem-ID des virtuellen "Favorites"-Eintrags in der Theme-Liste.
+    FAVORITES_ITEM_ID: ClassVar[str] = "fav-theme"
 
     def __init__(self) -> None:
         super().__init__()
@@ -253,10 +302,13 @@ class CodenameApp(App[None]):
         self.suggestions: list[Suggestion] = []
         # Recipes pro Theme - bleiben erhalten bis "r" neue erzeugt.
         self._recipes: dict[str, list[Recipe]] = {}
+        # Favoriten-Ansicht: rechts die Favoriten statt generierter Vorschlaege.
+        self._favorites_mode = False
 
         settings = self._settings_store.load()
         self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
         self.word_count = self._coerce_words(settings.get("word_count"))
+        self.suggestion_count = self._coerce_count(settings.get("suggestion_count"))
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
@@ -279,6 +331,17 @@ class CodenameApp(App[None]):
         except (TypeError, ValueError):
             return CodenameApp.WORD_COUNT_DEFAULT
         return max(1, min(3, value))
+
+    @staticmethod
+    def _coerce_count(raw: object) -> int:
+        """Normalisiert die Vorschlagsanzahl auf einen 10er-Schritt von 10..40."""
+        if not isinstance(raw, (int, float, str)):
+            return CodenameApp.SUGGESTION_COUNT_DEFAULT
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return CodenameApp.SUGGESTION_COUNT_DEFAULT
+        return max(10, min(40, value - (value % 10)))
 
     @staticmethod
     def _deserialize_favorites(raw: object) -> list[Suggestion]:
@@ -320,6 +383,7 @@ class CodenameApp(App[None]):
                 "theme": self.theme,
                 "mutation_percent": self.mutation_percent,
                 "word_count": self.word_count,
+                "suggestion_count": self.suggestion_count,
                 "favorites": self._serialize_favorites(),
             }
         )
@@ -333,8 +397,10 @@ class CodenameApp(App[None]):
         self._save_settings()
 
     def _theme_items(self) -> list[ListItem]:
-        """Baut die Theme-Listeneintraege - Beschreibung als Hover-Tooltip."""
-        items: list[ListItem] = []
+        """Baut die Theme-Listeneintraege - Favoriten zuoberst, dann die Themes."""
+        fav_item = ListItem(Static("Favorites"), id=self.FAVORITES_ITEM_ID)
+        fav_item.tooltip = "Your saved codenames"
+        items: list[ListItem] = [fav_item]
         for slug in self.theme_slugs:
             theme = self.generator.themes[slug]
             item = ListItem(Static(theme.name), id=f"theme-{slug}")
@@ -370,10 +436,19 @@ class CodenameApp(App[None]):
                         id="wordcount-slider",
                         classes="settings-slider",
                     )
+                    yield Static(id="count-label", classes="settings-label")
+                    yield Slider(
+                        min=10,
+                        max=40,
+                        step=10,
+                        value=self.suggestion_count,
+                        id="count-slider",
+                        classes="settings-slider",
+                    )
             yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
             with Vertical(id="right-pane"):
                 yield Static(id="info")
-                table: DataTable[str] = DataTable(
+                table: SuggestionsTable = SuggestionsTable(
                     cursor_type="row",
                     zebra_stripes=True,
                     id="suggestions",
@@ -390,7 +465,8 @@ class CodenameApp(App[None]):
         self.title = "codename-generator"
         self.sub_title = self.theme_slug
         list_view = self.query_one("#theme-list", ListView)
-        list_view.index = 0
+        # Index 0 ist der Favoriten-Eintrag - Start auf dem ersten echten Theme.
+        list_view.index = 1
         self._log_event(f"started - theme [b]{self.theme_slug}[/b]")
         self._ensure_recipes()
         self._rerender()
@@ -404,6 +480,9 @@ class CodenameApp(App[None]):
         log.write(f"[dim]{timestamp}[/dim]  {message}")
 
     def _update_info(self) -> None:
+        if self._favorites_mode:
+            self._update_favorites_info()
+            return
         theme = self.generator.themes[self.theme_slug]
         info = self.query_one("#info", Static)
         info.update(
@@ -433,18 +512,48 @@ class CodenameApp(App[None]):
             else f"Words: [b]{self.word_count}[/b]"
         )
 
+        # Die Vorschlagsanzahl gilt fuer jedes Theme - nie durch das Theme gesperrt.
+        # (count-slider explizit entsperren, falls zuvor die Favoriten-Ansicht aktiv war.)
+        count_label = self.query_one("#count-label", Static)
+        self.query_one("#count-slider", Slider).disabled = False
+        count_label.set_class(False, "locked")
+        count_label.update(f"Suggestions: [b]{self.suggestion_count}[/b]")
+
+    def _update_favorites_info(self) -> None:
+        """Info-Zeile und Slider-Sperren fuer die Favoriten-Ansicht.
+
+        In der Favoriten-Ansicht wirkt nur der Mutations-Slider - Wortzahl und
+        Vorschlagsanzahl sind ohne Bedeutung und werden gesperrt.
+        """
+        self.query_one("#info", Static).update(
+            "[b]Favorites[/b]  [dim]your saved codenames - only mutation "
+            f"applies here[/dim]   count: [b]{len(self.favorites)}[/b]"
+        )
+        mut_label = self.query_one("#mutation-label", Static)
+        wc_label = self.query_one("#wordcount-label", Static)
+        count_label = self.query_one("#count-label", Static)
+        self.query_one("#mutation-slider", Slider).disabled = False
+        self.query_one("#wordcount-slider", Slider).disabled = True
+        self.query_one("#count-slider", Slider).disabled = True
+        mut_label.set_class(False, "locked")
+        wc_label.set_class(True, "locked")
+        count_label.set_class(True, "locked")
+        mut_label.update(f"Mutation: [b]{self.mutation_percent}%[/b]")
+        wc_label.update("Words: [b]locked in favorites[/b]")
+        count_label.update("Suggestions: [b]locked in favorites[/b]")
+
     def _ensure_recipes(self) -> None:
         """Erzeugt Recipes fuer das aktuelle Theme, falls noch keine im Cache."""
         if self.theme_slug and self.theme_slug not in self._recipes:
             self._recipes[self.theme_slug] = self.generator.generate_recipes(
-                self.theme_slug, count=30
+                self.theme_slug, count=self.suggestion_count
             )
 
     def _fresh_recipes(self) -> None:
         """Verwirft die Recipes des aktuellen Themes und erzeugt neue."""
         if self.theme_slug:
             self._recipes[self.theme_slug] = self.generator.generate_recipes(
-                self.theme_slug, count=30
+                self.theme_slug, count=self.suggestion_count
             )
 
     def _rerender(self) -> None:
@@ -453,6 +562,9 @@ class CodenameApp(App[None]):
         Erzeugt KEINE neuen Recipes - die Grundzutaten bleiben stabil, nur die
         Darstellung (Mutation, Wortzahl) aendert sich.
         """
+        if self._favorites_mode:
+            self._render_favorites()
+            return
         if not self.theme_slug:
             return
         theme = self.generator.themes[self.theme_slug]
@@ -473,6 +585,27 @@ class CodenameApp(App[None]):
             )
         self._update_info()
 
+    def _render_favorites(self) -> None:
+        """Zeigt die gespeicherten Favoriten rechts an - mit aktueller Mutation."""
+        mutation = self.mutation_percent / 100.0
+        self.suggestions = [
+            self.generator.render_favorite(fav, mutation) for fav in self.favorites
+        ]
+        table = self.query_one("#suggestions", DataTable)
+        table.clear()
+        if not self.suggestions:
+            table.add_row("", "(no favorites yet)", "", "", "")
+        else:
+            for i, s in enumerate(self.suggestions, 1):
+                table.add_row(
+                    str(i),
+                    s.name,
+                    s.slug,
+                    s.pattern.value,
+                    "*" if s.mutated else "",
+                )
+        self._update_info()
+
     def _selected_suggestion(self) -> Suggestion | None:
         table = self.query_one("#suggestions", DataTable)
         if table.row_count == 0:
@@ -491,17 +624,34 @@ class CodenameApp(App[None]):
         self._switch_theme(event.item.id or "")
 
     def _switch_theme(self, item_id: str) -> None:
+        # Virtueller "Favorites"-Eintrag - rechts die Favoriten anzeigen.
+        if item_id == self.FAVORITES_ITEM_ID:
+            if not self._favorites_mode:
+                self._favorites_mode = True
+                self.sub_title = "favorites"
+                self._log_event("viewing [b]favorites[/b]")
+                self._rerender()
+            return
         if not item_id.startswith("theme-"):
             return
         slug = item_id[len("theme-") :]
-        if slug in self.generator.themes and slug != self.theme_slug:
-            self.theme_slug = slug
-            self.sub_title = slug
-            self._apply_theme_default_mutation()
-            self._log_event(f"theme -> [b]{slug}[/b]")
-            # Vorhandene Recipes des Themes bleiben erhalten (Cache).
-            self._ensure_recipes()
-            self._rerender()
+        if slug not in self.generator.themes:
+            return
+        was_favorites = self._favorites_mode
+        self._favorites_mode = False
+        if slug == self.theme_slug:
+            # Gleiche Theme - nur noetig, wenn wir aus der Favoriten-Ansicht kommen.
+            if was_favorites:
+                self.sub_title = slug
+                self._rerender()
+            return
+        self.theme_slug = slug
+        self.sub_title = slug
+        self._apply_theme_default_mutation()
+        self._log_event(f"theme -> [b]{slug}[/b]")
+        # Vorhandene Recipes des Themes bleiben erhalten (Cache).
+        self._ensure_recipes()
+        self._rerender()
 
     def _apply_theme_default_mutation(self) -> None:
         """Setzt die Mutation auf den Theme-Default beim Wechsel (falls deklariert)."""
@@ -516,6 +666,9 @@ class CodenameApp(App[None]):
         self._save_settings()
 
     def action_regenerate(self) -> None:
+        if self._favorites_mode:
+            self.notify("Favorites can't be regenerated", severity="warning")
+            return
         self._fresh_recipes()
         self._log_event("regenerated")
         self._rerender()
@@ -539,7 +692,7 @@ class CodenameApp(App[None]):
         self._log_event(f"copied name [b]{s.name}[/b]")
 
     def action_bump_mutation(self) -> None:
-        if not self.generator.themes[self.theme_slug].mutate:
+        if not self._favorites_mode and not self.generator.themes[self.theme_slug].mutate:
             self.notify("Mutation is locked for this theme", severity="warning")
             return
         new_value = (self.mutation_percent + self.MUTATION_BUMP) % 105
@@ -553,6 +706,9 @@ class CodenameApp(App[None]):
 
     def on_slider_changed(self, event: Slider.Changed) -> None:
         new_value = int(event.value)
+        # In der Favoriten-Ansicht sind Words/Suggestions gesperrt.
+        if self._favorites_mode and event.slider.id != "mutation-slider":
+            return
         if event.slider.id == "mutation-slider":
             if new_value == self.mutation_percent:
                 return
@@ -563,6 +719,15 @@ class CodenameApp(App[None]):
                 return
             self.word_count = new_value
             self._log_event(f"word count -> [b]{new_value}[/b]")
+        elif event.slider.id == "count-slider":
+            if new_value == self.suggestion_count:
+                return
+            self.suggestion_count = new_value
+            self._log_event(f"suggestions -> [b]{new_value}[/b]")
+            # Recipe-Cache aller Themes verwerfen - die Anzahl hat sich
+            # geaendert, vorhandene Recipes passen nicht mehr.
+            self._recipes.clear()
+            self._ensure_recipes()
         else:
             return
         self._save_settings()
@@ -581,6 +746,9 @@ class CodenameApp(App[None]):
         self._update_info()
 
     def action_toggle_favorite(self) -> None:
+        if self._favorites_mode:
+            self._remove_favorite_at_cursor()
+            return
         s = self._selected_suggestion()
         if s is None:
             return
@@ -596,11 +764,66 @@ class CodenameApp(App[None]):
         self._save_settings()
         self._update_info()
 
+    def _remove_favorite_at_cursor(self) -> None:
+        """Entfernt den Favoriten in der Cursor-Zeile (nur Favoriten-Ansicht)."""
+        table = self.query_one("#suggestions", DataTable)
+        row = table.cursor_row
+        if not 0 <= row < len(self.favorites):
+            return
+        removed = self.favorites.pop(row)
+        self.notify(f"Removed favorite: {removed.name}")
+        self._log_event(f"unfav [b]{removed.name}[/b]")
+        self._save_settings()
+        self._rerender()
+
     def action_open_favorites(self) -> None:
         self.push_screen(FavoritesScreen(self.favorites))
 
     def action_about(self) -> None:
         self.push_screen(AboutScreen())
+
+    def on_suggestions_table_right_clicked(
+        self, event: SuggestionsTable.RightClicked
+    ) -> None:
+        """Oeffnet das Kontextmenue fuer die rechtsgeklickte Vorschlagszeile."""
+        if len(self.screen_stack) > 1:
+            return
+        if not 0 <= event.row < len(self.suggestions):
+            return
+        suggestion = self.suggestions[event.row]
+        is_fav = self._favorites_mode or any(
+            f.slug == suggestion.slug for f in self.favorites
+        )
+        items = [
+            ContextMenuItem("copy_slug", "Copy slug", shortcut="c"),
+            ContextMenuItem("copy_name", "Copy name", shortcut="n"),
+            ContextMenuItem.separator(),
+            ContextMenuItem(
+                "toggle_favorite",
+                "Remove favorite" if is_fav else "Add favorite",
+                icon="★" if is_fav else "☆",
+                shortcut="f",
+            ),
+        ]
+        # "Regenerate" gibt es nur fuer echte Themes, nicht in der Favoriten-Ansicht.
+        if not self._favorites_mode:
+            items.append(ContextMenuItem.separator())
+            items.append(ContextMenuItem("regenerate", "Regenerate all", shortcut="r"))
+        self.push_screen(
+            ContextMenuScreen(items, at=(event.screen_x, event.screen_y)),
+            callback=self._on_context_action,
+        )
+
+    def _on_context_action(self, action_id: str | None) -> None:
+        """Fuehrt die im Kontextmenue gewaehlte Aktion aus."""
+        if action_id == "copy_slug":
+            self.action_copy_slug()
+        elif action_id == "copy_name":
+            self.action_copy_name()
+        elif action_id == "toggle_favorite":
+            self.action_toggle_favorite()
+        elif action_id == "regenerate":
+            self.action_regenerate()
 
 
 def _reset_mouse_tracking() -> None:

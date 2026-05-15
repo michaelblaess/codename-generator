@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import re
+import zlib
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -64,6 +65,21 @@ _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 def _slugify(text: str) -> str:
     return _SLUG_RE.sub("-", text.lower()).strip("-")
+
+
+def _compose_name(pattern: Pattern, theme_word: str, modifiers: tuple[str, ...]) -> str:
+    """Setzt einen Namen aus Pattern, Theme-Wort und Modifiern zusammen."""
+    mods = list(modifiers)
+    if pattern == Pattern.THEME_ONLY:
+        return theme_word
+    if pattern == Pattern.THEME_VERB:
+        return f"{theme_word} {mods[0]}" if mods else theme_word
+    if pattern == Pattern.ADJ_THEME_VERB:
+        if len(mods) >= 2:
+            return f"{mods[0]} {theme_word} {mods[1]}"
+        return theme_word
+    # ADJ_THEME und VERB_THEME: Modifier vorangestellt.
+    return f"{mods[0]} {theme_word}" if mods else theme_word
 
 
 def _patterns_from_strings(values: tuple[str, ...]) -> tuple[Pattern, ...]:
@@ -204,6 +220,36 @@ class Generator:
             pattern=pattern,
             mutated=mutated,
             source_words=sources,
+        )
+
+    def render_favorite(self, favorite: Suggestion, mutation_chance: float) -> Suggestion:
+        """Rendert einen Favoriten mit der aktuellen Mutation neu.
+
+        Pattern und Modifier des Favoriten bleiben erhalten - nur das Theme-Wort
+        (das erste source_word) wird ggf. phonetisch mutiert. Der Seed wird
+        stabil aus dem Slug abgeleitet, sodass derselbe Mutationswert immer das
+        gleiche Ergebnis liefert (kein Flackern beim Schieben des Sliders).
+        """
+        if not favorite.source_words:
+            return favorite
+        theme_word = favorite.source_words[0]
+        modifiers = favorite.source_words[1:]
+        rng = random.Random(zlib.crc32(favorite.slug.encode("utf-8")))
+        rendered = theme_word
+        mutated = False
+        if rng.random() < mutation_chance:
+            for _ in range(_MUTATION_RETRIES):
+                candidate = mutate(theme_word, rng)
+                if candidate != theme_word:
+                    rendered, mutated = candidate, True
+                    break
+        name = _compose_name(favorite.pattern, rendered, modifiers)
+        return Suggestion(
+            name=name.title(),
+            slug=_slugify(name),
+            pattern=favorite.pattern,
+            mutated=mutated,
+            source_words=favorite.source_words,
         )
 
     def suggest(
