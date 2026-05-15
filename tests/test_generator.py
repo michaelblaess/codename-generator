@@ -62,18 +62,11 @@ def test_suggest_unknown_theme_raises() -> None:
 
 
 def test_zero_mutation_chance_produces_no_mutations() -> None:
-    """Bei mutation_chance=0 darf nichts mutiert sein, auch kein THEME_ONLY.
-
-    Der THEME_ONLY-Pattern faellt bei 0% komplett weg, weil er sonst sein
-    eigenes Force-Mutation-Verhalten triggern wuerde.
-    """
+    """Bei mutation_chance=0 darf kein Vorschlag mutiert sein."""
     gen = Generator.load(seed=7)
     suggestions = gen.suggest("greek-gods", count=20, mutation_chance=0.0)
-    for s in suggestions:
-        assert not s.mutated, f"no suggestion may be mutated at 0%: {s}"
-        assert s.pattern is not Pattern.THEME_ONLY, (
-            f"THEME_ONLY must not appear at 0%: {s}"
-        )
+    assert suggestions
+    assert all(not s.mutated for s in suggestions)
 
 
 def test_pattern_enum_covers_all_used() -> None:
@@ -83,16 +76,32 @@ def test_pattern_enum_covers_all_used() -> None:
     assert patterns_used.issubset(set(Pattern))
 
 
-def test_theme_only_never_returns_bare_source_word() -> None:
-    """THEME_ONLY-Vorschlaege duerfen niemals identisch mit dem Quellwort sein."""
-    gen = Generator.load(seed=123)
-    theme_words = {w.lower() for w in gen.themes["racehorses"].words}
-    # mutation_chance > 0 noetig, sonst kommt THEME_ONLY gar nicht vor
-    suggestions = gen.suggest("racehorses", count=50, mutation_chance=0.3)
-    for s in suggestions:
-        if s.pattern is Pattern.THEME_ONLY:
-            assert s.mutated, f"theme-only must be mutated: {s}"
-            assert s.name.lower() not in theme_words, f"bare source word leaked: {s}"
+def test_render_keeps_theme_word_stable_across_settings() -> None:
+    """Dasselbe Recipe behaelt sein Theme-Wort bei jeder Mutation/Wortzahl."""
+    gen = Generator.load(seed=5)
+    recipes = gen.generate_recipes("greek-gods", count=10)
+    theme = gen.themes["greek-gods"]
+    for recipe in recipes:
+        s1 = gen.render(recipe, theme, word_count=1, mutation_chance=0.0)
+        s2 = gen.render(recipe, theme, word_count=2, mutation_chance=0.5)
+        s3 = gen.render(recipe, theme, word_count=3, mutation_chance=1.0)
+        assert s1.source_words[0] == recipe.theme_word
+        assert s2.source_words[0] == recipe.theme_word
+        assert s3.source_words[0] == recipe.theme_word
+        assert PATTERN_WORD_COUNT[s1.pattern] == 1
+        assert PATTERN_WORD_COUNT[s2.pattern] == 2
+        assert PATTERN_WORD_COUNT[s3.pattern] == 3
+
+
+def test_render_is_deterministic() -> None:
+    """Gleiches Recipe + gleiche Parameter -> identische Suggestion."""
+    gen = Generator.load(seed=5)
+    recipes = gen.generate_recipes("flowers", count=5)
+    theme = gen.themes["flowers"]
+    for recipe in recipes:
+        first = gen.render(recipe, theme, word_count=2, mutation_chance=1.0)
+        second = gen.render(recipe, theme, word_count=2, mutation_chance=1.0)
+        assert first == second
 
 
 def test_each_theme_word_appears_at_most_once() -> None:
@@ -125,15 +134,16 @@ def test_evocative_and_power_words_default_to_zero_mutation() -> None:
         assert theme.default_mutation == 0, f"{slug} default_mutation should be 0"
 
 
-def test_bare_theme_emits_unmutated_words() -> None:
-    """power-words ist bare - nackte Einzelwoerter sind erlaubt, auch bei 0%."""
+def test_power_words_emits_clean_single_words() -> None:
+    """power-words liefert bei 0% Mutation nackte, unmutierte Einzelwoerter."""
     gen = Generator.load(seed=4)
     theme_words = set(gen.themes["power-words"].words)
     suggestions = gen.suggest("power-words", count=20, mutation_chance=0.0)
     assert suggestions
     for s in suggestions:
         assert s.pattern is Pattern.THEME_ONLY
-        assert s.name in theme_words, f"bare theme word expected: {s}"
+        assert not s.mutated
+        assert s.name in theme_words, f"clean theme word expected: {s}"
 
 
 def test_mutate_false_disables_mutation() -> None:

@@ -49,7 +49,10 @@ uv run codename  # any platform
 Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `a` about · `q` quit
 
 The left settings panel has two sliders: **mutation chance** (0-100%) and
-**word count** (exactly 1, 2 or 3 components per name). Hover a theme in the
+**word count** (exactly 1, 2 or 3 components per name). Moving a slider
+re-renders the *current* set of names in place so you see the effect
+immediately — only `r` draws a fresh batch. Each theme keeps its own set, so
+switching themes back and forth never loses what you had. Hover a theme in the
 list for a tooltip describing it. Ships with 35+ themes (Textual built-ins
 plus retro palettes) — switch with `t` or the Ctrl+P theme picker. Chosen
 theme, mutation chance, word count and favorites are persisted to

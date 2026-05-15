@@ -2,7 +2,6 @@ name: Power Words
 description: Single bold standalone words - no modifiers, mutation off by default
 patterns:
   - theme
-bare: true
 default_mutation: 0
 words:
   - Mythos
