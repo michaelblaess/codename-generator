@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import datetime
 from typing import ClassVar
 
@@ -602,8 +603,26 @@ class CodenameApp(App[None]):
         self.push_screen(AboutScreen())
 
 
+def _reset_mouse_tracking() -> None:
+    """Schaltet Maus-Tracking nach App-Ende explizit ab.
+
+    Unter Windows laesst Textuals Teardown gelegentlich Maus-Tracking-Modi
+    aktiv - danach landet bei jeder Mausbewegung Steuerzeichen-Muell
+    (z.B. `[555;114;57M`) in der Shell. Dieser Reset ist idempotent: sind
+    die Modi bereits aus, bewirken die Sequenzen nichts.
+    """
+    if not sys.stdout.isatty():
+        return
+    # ?1000/?1002/?1003 = Maus-Tracking-Modi, ?1006/?1015 = erweitertes Encoding
+    sys.stdout.write("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1015l")
+    sys.stdout.flush()
+
+
 def run_tui() -> None:
-    CodenameApp().run()
+    try:
+        CodenameApp().run()
+    finally:
+        _reset_mouse_tracking()
 
 
 __all__ = ["RANDOM_THEME_SLUG", "CodenameApp", "run_tui"]
