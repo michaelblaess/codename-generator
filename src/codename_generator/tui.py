@@ -187,17 +187,20 @@ class CodenameApp(App[None]):
         height: 1fr;
     }
     #settings-pane {
-        height: 11;
-        padding: 1 1 0 1;
+        height: 15;
+        padding: 1 2;
         background: $boost;
     }
     #settings-title {
         text-style: bold;
-        padding: 0;
+        padding: 0 0 1 0;
     }
     .settings-label {
         color: $text-muted;
         padding: 0;
+    }
+    .settings-label.locked {
+        color: $text-disabled;
     }
     .settings-slider {
         width: 1fr;
@@ -390,17 +393,34 @@ class CodenameApp(App[None]):
         log.write(f"[dim]{timestamp}[/dim]  {message}")
 
     def _update_info(self) -> None:
+        theme = self.generator.themes[self.theme_slug]
         info = self.query_one("#info", Static)
         info.update(
-            f"[b]{self.generator.themes[self.theme_slug].name}[/b]   "
+            f"[b]{theme.name}[/b]   "
             f"theme: [b]{self.theme}[/b]   "
             f"favorites: [b]{len(self.favorites)}[/b]"
         )
-        self.query_one("#mutation-label", Static).update(
-            f"Mutation: [b]{self.mutation_percent}%[/b]"
+
+        # Themes mit eigenen Patterns / mutate=false machen die Slider wirkungslos.
+        mutation_locked = not theme.mutate
+        words_locked = bool(theme.patterns)
+
+        mut_label = self.query_one("#mutation-label", Static)
+        wc_label = self.query_one("#wordcount-label", Static)
+        self.query_one("#mutation-slider", Slider).disabled = mutation_locked
+        self.query_one("#wordcount-slider", Slider).disabled = words_locked
+        mut_label.set_class(mutation_locked, "locked")
+        wc_label.set_class(words_locked, "locked")
+
+        mut_label.update(
+            "Mutation: [b]locked by theme[/b]"
+            if mutation_locked
+            else f"Mutation: [b]{self.mutation_percent}%[/b]"
         )
-        self.query_one("#wordcount-label", Static).update(
-            f"Words: max [b]{self.max_words}[/b]"
+        wc_label.update(
+            "Words: [b]locked by theme[/b]"
+            if words_locked
+            else f"Words: max [b]{self.max_words}[/b]"
         )
 
     def _regenerate(self) -> None:
@@ -481,6 +501,9 @@ class CodenameApp(App[None]):
             self._log_event(f"[red]clipboard error: {exc}[/red]")
 
     def action_bump_mutation(self) -> None:
+        if not self.generator.themes[self.theme_slug].mutate:
+            self.notify("Mutation is locked for this theme", severity="warning")
+            return
         new_value = (self.mutation_percent + self.MUTATION_BUMP) % 105
         new_value = min(100, new_value - (new_value % 5))
         self.mutation_percent = new_value
