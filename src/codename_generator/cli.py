@@ -25,11 +25,11 @@ def main() -> int:
         help="0..1 probability a suggestion uses phonetic mutation",
     )
     parser.add_argument(
-        "--max-words",
+        "--words",
         type=int,
-        default=3,
+        default=2,
         choices=(1, 2, 3),
-        help="Maximum number of name components (1-3)",
+        help="Exact number of name components (1-3)",
     )
     parser.add_argument("--list-themes", action="store_true")
     args = parser.parse_args()
@@ -51,7 +51,7 @@ def main() -> int:
             theme_slug=args.theme,
             count=args.count,
             mutation_chance=args.mutation_chance,
-            max_words=args.max_words,
+            word_count=args.words,
         )
     except KeyError as exc:
         print(f"Error: {exc}", file=sys.stderr)

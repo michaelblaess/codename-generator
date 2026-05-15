@@ -49,9 +49,10 @@ uv run codename  # any platform
 Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `a` about · `q` quit
 
 The left settings panel has two sliders: **mutation chance** (0-100%) and
-**word count** (1-3 components per name). Ships with 35+ themes (Textual
-built-ins plus retro palettes) — switch with `t` or the Ctrl+P theme picker.
-Chosen theme, mutation chance, word count and favorites are persisted to
+**word count** (exactly 1, 2 or 3 components per name). Hover a theme in the
+list for a tooltip describing it. Ships with 35+ themes (Textual built-ins
+plus retro palettes) — switch with `t` or the Ctrl+P theme picker. Chosen
+theme, mutation chance, word count and favorites are persisted to
 `~/.codename-generator/settings.json` across restarts.
 
 ### CLI
@@ -61,7 +62,7 @@ uv run codename --list-themes
 uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 uv run codename -t random -n 20         # pulls from every theme
-uv run codename -t whisky --max-words 2 # at most 2 components per name
+uv run codename -t whisky --words 3     # exactly 3 components per name
 ```
 
 A `*` next to a suggestion means a phonetic mutation was applied

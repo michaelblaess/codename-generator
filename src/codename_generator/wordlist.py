@@ -22,6 +22,8 @@ class WordList:
     bare: bool = False
     # mutate: schaltet phonetische Mutation fuer dieses Theme ab wenn False.
     mutate: bool = True
+    # default_mutation: Start-Mutationswert in Prozent beim Wechsel zum Theme.
+    default_mutation: int | None = None
 
 
 def _load_yaml(path: Path) -> dict[str, object]:
@@ -54,7 +56,17 @@ def _wordlist_from_path(path: Path) -> WordList:
         patterns=_str_tuple(data.get("patterns")),
         bare=bool(data.get("bare", False)),
         mutate=bool(data.get("mutate", True)),
+        default_mutation=_optional_int(data.get("default_mutation")),
     )
+
+
+def _optional_int(raw: object) -> int | None:
+    """Konvertiert einen YAML-Wert in int oder None."""
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    return None
 
 
 def load_themes() -> dict[str, WordList]:

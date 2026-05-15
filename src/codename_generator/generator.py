@@ -159,23 +159,23 @@ class Generator:
         count: int = 10,
         mutation_chance: float = 0.35,
         patterns: tuple[Pattern, ...] | None = None,
-        max_words: int = 3,
+        word_count: int = 2,
     ) -> list[Suggestion]:
         """Generiere `count` Codenamen-Vorschlaege fuer ein Theme.
 
         Wenn mutation_chance == 1.0, werden nur Vorschlaege akzeptiert, deren
-        Theme-Wort tatsaechlich phonetisch mutiert wurde. `max_words` begrenzt
-        die Anzahl der Namens-Komponenten (1..3).
+        Theme-Wort tatsaechlich phonetisch mutiert wurde. `word_count` legt die
+        exakte Anzahl der Namens-Komponenten fest (1..3).
         """
         if theme_slug not in self.themes:
             raise KeyError(f"Unknown theme: {theme_slug}")
         theme = self.themes[theme_slug]
-        # Theme-eigene Patterns haben Vorrang und ignorieren das Wort-Limit.
+        # Theme-eigene Patterns haben Vorrang und ignorieren die Wortzahl.
         if theme.patterns:
             pool = _patterns_from_strings(theme.patterns)
         else:
             pool = patterns or tuple(Pattern)
-            pool = tuple(p for p in pool if PATTERN_WORD_COUNT[p] <= max_words)
+            pool = tuple(p for p in pool if PATTERN_WORD_COUNT[p] == word_count)
         # Bei 0% Mutation den THEME_ONLY-Pattern weglassen - er wuerde sonst
         # trotzdem ein mutiertes Wort erzeugen (sein Force-Mutation-Pfad).
         # Ausnahme: Themes die nackte Woerter erlauben (bare).
