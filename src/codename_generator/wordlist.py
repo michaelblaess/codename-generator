@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
@@ -14,6 +14,14 @@ class WordList:
     name: str
     description: str
     words: tuple[str, ...]
+    # Optionale Theme-Overrides - leeres Tuple bedeutet "globalen Pool nutzen".
+    adjectives: tuple[str, ...] = field(default_factory=tuple)
+    verbs: tuple[str, ...] = field(default_factory=tuple)
+    patterns: tuple[str, ...] = field(default_factory=tuple)
+    # bare: erlaubt nicht-mutierte Einzelwoerter als Vorschlag.
+    bare: bool = False
+    # mutate: schaltet phonetische Mutation fuer dieses Theme ab wenn False.
+    mutate: bool = True
 
 
 def _load_yaml(path: Path) -> dict[str, object]:
@@ -22,6 +30,13 @@ def _load_yaml(path: Path) -> dict[str, object]:
     if not isinstance(data, dict):
         raise ValueError(f"YAML root must be a mapping: {path}")
     return data
+
+
+def _str_tuple(raw: object) -> tuple[str, ...]:
+    """Konvertiert einen YAML-Wert in ein Tuple von Strings (leer wenn keine Liste)."""
+    if not isinstance(raw, list):
+        return ()
+    return tuple(str(item) for item in raw)
 
 
 def _wordlist_from_path(path: Path) -> WordList:
@@ -34,6 +49,11 @@ def _wordlist_from_path(path: Path) -> WordList:
         name=str(data.get("name", path.stem)),
         description=str(data.get("description", "")),
         words=tuple(str(w) for w in words),
+        adjectives=_str_tuple(data.get("adjectives")),
+        verbs=_str_tuple(data.get("verbs")),
+        patterns=_str_tuple(data.get("patterns")),
+        bare=bool(data.get("bare", False)),
+        mutate=bool(data.get("mutate", True)),
     )
 
 

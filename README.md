@@ -8,13 +8,24 @@
 [![CI](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Themes](https://img.shields.io/badge/themes-14-yellow)](src/codename_generator/data/themes)
+[![Themes](https://img.shields.io/badge/themes-17-yellow)](src/codename_generator/data/themes)
 
 A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, whisky, ...), get 30 unique suggestions combined with adjective or verb modifiers and optional phonetic mutations.
 
 ## Themes
 
-Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Random (pooled)
+Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Dev · Random (pooled)
+
+Two themes use their own curated word pools:
+
+- **Evocative** - a stark adjective + an emotionally charged noun
+  (`Cold Ember`, `Iron Hour`, `Sacred Tide`). Never mutated.
+- **Power words** - single bold standalone words, no modifiers
+  (`Mythos`, `Skyline`, `Oracle`, `Aegis`).
+
+A theme YAML can override the global modifier pools (`adjectives`, `verbs`),
+restrict `patterns`, allow bare unmutated words (`bare: true`) or disable
+mutation (`mutate: false`).
 
 ## Setup
 

@@ -110,6 +110,46 @@ def test_source_words_normalized_theme_first() -> None:
         )
 
 
+def test_bare_theme_emits_unmutated_words() -> None:
+    """power-words ist bare - nackte Einzelwoerter sind erlaubt, auch bei 0%."""
+    gen = Generator.load(seed=4)
+    theme_words = set(gen.themes["power-words"].words)
+    suggestions = gen.suggest("power-words", count=20, mutation_chance=0.0)
+    assert suggestions
+    for s in suggestions:
+        assert s.pattern is Pattern.THEME_ONLY
+        assert s.name in theme_words, f"bare theme word expected: {s}"
+
+
+def test_mutate_false_theme_never_mutates() -> None:
+    """evocative hat mutate=false - kein Vorschlag darf mutiert sein."""
+    gen = Generator.load(seed=4)
+    suggestions = gen.suggest("evocative", count=30, mutation_chance=1.0)
+    assert suggestions
+    assert all(not s.mutated for s in suggestions)
+
+
+def test_theme_pattern_override_restricts_pool() -> None:
+    """evocative deklariert patterns=[adj-theme] - nur dieses Pattern kommt vor."""
+    gen = Generator.load(seed=4)
+    suggestions = gen.suggest("evocative", count=30, mutation_chance=0.5, max_words=1)
+    assert suggestions
+    assert all(s.pattern is Pattern.ADJ_THEME for s in suggestions)
+
+
+def test_theme_modifier_override_uses_own_verbs() -> None:
+    """dev nutzt eigene Verb-Liste fuer verb-basierte Patterns."""
+    gen = Generator.load(seed=4)
+    dev_verbs = {v.lower() for v in gen.themes["dev"].verbs}
+    assert dev_verbs
+    suggestions = gen.suggest("dev", count=40, mutation_chance=0.0)
+    verb_patterns = (Pattern.VERB_THEME, Pattern.THEME_VERB)
+    for s in suggestions:
+        if s.pattern in verb_patterns:
+            modifier = s.source_words[1].lower()
+            assert modifier in dev_verbs, f"dev verb expected: {s}"
+
+
 def test_random_theme_exists_and_pools_words() -> None:
     gen = Generator.load(seed=0)
     assert "random" in gen.themes

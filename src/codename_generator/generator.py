@@ -46,6 +46,17 @@ def _slugify(text: str) -> str:
     return _SLUG_RE.sub("-", text.lower()).strip("-")
 
 
+def _patterns_from_strings(values: tuple[str, ...]) -> tuple[Pattern, ...]:
+    """Konvertiert Pattern-Strings zu Enums, ungueltige werden uebersprungen."""
+    result: list[Pattern] = []
+    for value in values:
+        try:
+            result.append(Pattern(value))
+        except ValueError:
+            continue
+    return tuple(result)
+
+
 def _build_random_theme(themes: dict[str, WordList]) -> WordList:
     """Virtuelles Random-Theme: alle Woerter aus allen Themes zusammen."""
     pooled = tuple(sorted({w for t in themes.values() for w in t.words}))
@@ -97,13 +108,17 @@ class Generator:
         pattern: Pattern,
         mutation_chance: float,
     ) -> Suggestion:
-        adjectives = self.modifiers["adjectives"].words
-        verbs = self.modifiers["verbs"].words
+        # Theme-eigene Modifier-Pools haben Vorrang vor den globalen Listen.
+        adjectives = theme.adjectives or self.modifiers["adjectives"].words
+        verbs = theme.verbs or self.modifiers["verbs"].words
         theme_word = self._pick(theme.words)
         # Ohne Modifier waere eine nicht-mutierte Suggestion identisch mit dem
-        # Quellwort - dann zwingend mutieren, sonst wird der Vorschlag verworfen.
-        force_mutation = pattern is Pattern.THEME_ONLY
-        want_mutation = force_mutation or self.rng.random() < mutation_chance
+        # Quellwort - dann zwingend mutieren, ausser das Theme erlaubt nackte
+        # Woerter (bare). Bei mutate=False findet ueberhaupt keine Mutation statt.
+        force_mutation = pattern is Pattern.THEME_ONLY and not theme.bare
+        want_mutation = theme.mutate and (
+            force_mutation or self.rng.random() < mutation_chance
+        )
         rendered_theme, mutated = self._render_theme_word(theme_word, want_mutation)
 
         # source_words[0] ist immer das Theme-Wort, danach folgen Modifier.
@@ -155,19 +170,23 @@ class Generator:
         if theme_slug not in self.themes:
             raise KeyError(f"Unknown theme: {theme_slug}")
         theme = self.themes[theme_slug]
-        pool = patterns or tuple(Pattern)
-        # Pattern auf die maximale Wortzahl begrenzen.
-        pool = tuple(p for p in pool if PATTERN_WORD_COUNT[p] <= max_words)
+        # Theme-eigene Patterns haben Vorrang und ignorieren das Wort-Limit.
+        if theme.patterns:
+            pool = _patterns_from_strings(theme.patterns)
+        else:
+            pool = patterns or tuple(Pattern)
+            pool = tuple(p for p in pool if PATTERN_WORD_COUNT[p] <= max_words)
         # Bei 0% Mutation den THEME_ONLY-Pattern weglassen - er wuerde sonst
         # trotzdem ein mutiertes Wort erzeugen (sein Force-Mutation-Pfad).
-        if mutation_chance <= 0.0:
+        # Ausnahme: Themes die nackte Woerter erlauben (bare).
+        if mutation_chance <= 0.0 and not theme.bare:
             pool = tuple(p for p in pool if p is not Pattern.THEME_ONLY)
         if not pool:
             return []
         seen_slugs: set[str] = set()
         seen_theme_words: set[str] = set()
         result: list[Suggestion] = []
-        require_mutation = mutation_chance >= 1.0
+        require_mutation = mutation_chance >= 1.0 and theme.mutate
         attempts = 0
         max_attempts = count * 40
         while len(result) < count and attempts < max_attempts:
@@ -178,8 +197,13 @@ class Generator:
                 continue
             if require_mutation and not suggestion.mutated:
                 continue
-            # Bare source word ohne Modifier und ohne Mutation -> kein Vorschlag.
-            if pattern is Pattern.THEME_ONLY and not suggestion.mutated:
+            # Nacktes Quellwort ohne Modifier und ohne Mutation nur erlaubt,
+            # wenn das Theme nackte Woerter explizit zulaesst (bare).
+            if (
+                not theme.bare
+                and pattern is Pattern.THEME_ONLY
+                and not suggestion.mutated
+            ):
                 continue
             # Jedes Quellwort des Themes darf nur einmal vorkommen -
             # sonst tauchen mehrere Mutationen desselben Wortes auf
