@@ -10,14 +10,12 @@
 #   xcode-select --install
 #
 # Hinweise zu macOS:
-# - Es entsteht KEIN .app-Bundle - das ist ein Terminal-/TUI-Programm, also
-#   eine schlichte Binary in einem Ordner (kein --macos-create-app-bundle).
-# - Nuitka signiert die Binary auf macOS automatisch ad-hoc. Damit laeuft sie
-#   lokal und im Team. Beim Download setzt macOS aber ein Quarantaene-Attribut -
-#   der Empfaenger muss es einmalig entfernen:
+# - Es entsteht KEIN .app-Bundle - das ist ein Terminal-/TUI-Programm.
+# - Nuitka signiert die Binary auf macOS automatisch ad-hoc. Beim Download
+#   setzt macOS ein Quarantaene-Attribut - der Empfaenger muss es entfernen:
 #     xattr -dr com.apple.quarantine codename-generator
-#   Fuer echte Verteilung ohne Gatekeeper-Warnung braeuchte es eine Apple
-#   Developer ID + Notarisierung (separater Schritt, hier nicht abgedeckt).
+#   Fuer Verteilung ohne Gatekeeper-Warnung braeuchte es eine Apple Developer
+#   ID + Notarisierung (separater Schritt, hier nicht abgedeckt).
 
 set -euo pipefail
 
@@ -28,17 +26,28 @@ out_dir="$root/dist"
 dist_dir="$out_dir/codename-generator"
 arch="$(uname -m)"   # arm64 (Apple Silicon) oder x86_64 (Intel)
 
+# Build-Tools pruefen, bevor Nuitka mittendrin abbricht
+if ! command -v clang >/dev/null 2>&1; then
+    echo "Fehlt: clang - bitte Xcode Command Line Tools installieren: xcode-select --install" >&2
+    exit 1
+fi
+
+# venv mit dem Lockfile abgleichen, damit Nuitka keine veralteten
+# (Git-)Dependencies einkompiliert. --inexact laesst Extra-Pakete wie das
+# ad-hoc installierte nuitka unangetastet. Vor der $python-Ermittlung, damit
+# bei frischem Checkout (CI) ueberhaupt eine .venv existiert.
+if command -v uv >/dev/null 2>&1; then
+    echo "Syncing venv to lockfile (uv sync --inexact)..."
+    uv sync --inexact --project "$root"
+else
+    echo "uv nicht gefunden - venv-Sync uebersprungen" >&2
+fi
+
 # venv-Python bevorzugen, sonst System-Python
 if [ -x "$root/.venv/bin/python" ]; then
     python="$root/.venv/bin/python"
 else
     python="python3"
-fi
-
-# Build-Tools pruefen, bevor Nuitka mittendrin abbricht
-if ! command -v clang >/dev/null 2>&1; then
-    echo "Fehlt: clang - bitte Xcode Command Line Tools installieren: xcode-select --install" >&2
-    exit 1
 fi
 
 # Version aus __init__.py lesen, damit nichts driftet
@@ -58,7 +67,7 @@ started=$(date +%s)
 
 # --standalone        : self-contained, kein Python auf dem Zielrechner noetig
 # --remove-output     : C-/Objekt-Zwischendateien nach dem Build aufraeumen
-# --include-package-data : data/themes/*.yaml + data/modifiers/*.yaml mitnehmen
+# --include-package-data=codename_generator : data/themes/*.yaml mitnehmen
 "$python" -m nuitka \
     --standalone \
     --assume-yes-for-downloads \
@@ -69,7 +78,7 @@ started=$(date +%s)
     --output-filename=codename-generator \
     "$entry"
 
-# Nuitka benennt den dist-Ordner nach dem Hauptmodul (cli.dist) - umbenennen
+# Nuitka benennt den dist-Ordner nach dem Entry-Skript (cli.dist) - umbenennen
 if [ -d "$out_dir/cli.dist" ]; then
     mv "$out_dir/cli.dist" "$dist_dir"
 fi
