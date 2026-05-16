@@ -14,7 +14,7 @@ Set-Location $PSScriptRoot
 Write-Host "=== codename-generator - dev environment ===" -ForegroundColor Cyan
 
 Write-Host "[1/2] venv + dependencies (uv sync)..."
-uv sync --extra dev
+uv sync
 if ($LASTEXITCODE -ne 0) { throw "uv sync fehlgeschlagen" }
 
 Write-Host "[2/2] Nuitka build tool..."

@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 echo "=== codename-generator - dev environment ==="
 
 echo "[1/2] venv + dependencies (uv sync)..."
-uv sync --extra dev
+uv sync
 
 echo "[2/2] Nuitka build tool..."
 uv pip install nuitka
