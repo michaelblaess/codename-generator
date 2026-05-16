@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-# Launch the codename generator. Args are forwarded to the CLI/TUI.
+# run.sh - starts codename-generator from source.
 set -euo pipefail
 cd "$(dirname "$0")"
-exec uv run codename "$@"
+
+if [ ! -d ".venv" ]; then
+    echo "Please run ./bootstrap.sh first." >&2
+    exit 1
+fi
+
+.venv/bin/python -m codename_generator.cli "$@"

@@ -7,7 +7,7 @@
     Produces a self-contained --standalone build (no Python install needed on
     the target machine). Output: dist\codename-generator\codename-generator.exe
     plus its DLLs, and a zipped dist\codename-generator-vX.Y.Z-win64.zip ready
-    to hand out. The folder is also what a later installer (NSIS/WiX) wraps.
+    to hand out.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +18,18 @@ $entry   = Join-Path $root "src\codename_generator\cli.py"
 $initPy  = Join-Path $root "src\codename_generator\__init__.py"
 $outDir  = Join-Path $root "dist"
 $distDir = Join-Path $outDir "codename-generator"
+
+# venv mit dem Lockfile abgleichen, damit Nuitka keine veralteten
+# (Git-)Dependencies einkompiliert. --inexact laesst Extra-Pakete wie das
+# ad-hoc installierte nuitka unangetastet. Vor der $python-Ermittlung, damit
+# bei frischem Checkout (CI) ueberhaupt eine .venv existiert.
+if (Get-Command uv -ErrorAction SilentlyContinue) {
+    Write-Host "Syncing venv to lockfile (uv sync --inexact)..." -ForegroundColor Cyan
+    & uv sync --inexact --project $root
+    if ($LASTEXITCODE -ne 0) { throw "uv sync fehlgeschlagen" }
+} else {
+    Write-Host "uv nicht gefunden - venv-Sync uebersprungen" -ForegroundColor Yellow
+}
 
 # venv-Python bevorzugen, sonst System-Python
 $venvPython = Join-Path $root ".venv\Scripts\python.exe"
@@ -36,7 +48,7 @@ $started = Get-Date
 
 # --standalone        : self-contained, kein Python auf dem Zielrechner noetig
 # --remove-output     : C-/Objekt-Zwischendateien nach dem Build aufraeumen
-# --include-package-data : data\themes\*.yaml + data\modifiers\*.yaml mitnehmen
+# --include-package-data=codename_generator : data\themes\*.yaml mitnehmen
 # (kein --windows-console-mode: Default behaelt die Konsole - noetig fuer das TUI)
 & $python -m nuitka `
     --standalone `
@@ -54,7 +66,7 @@ $started = Get-Date
 
 if ($LASTEXITCODE -ne 0) { throw "Nuitka-Build fehlgeschlagen (Exit $LASTEXITCODE)" }
 
-# Nuitka benennt den dist-Ordner nach dem Hauptmodul (cli.dist) - umbenennen
+# Nuitka benennt den dist-Ordner nach dem Entry-Skript (cli.dist) - umbenennen
 $nuitkaDist = Join-Path $outDir "cli.dist"
 if (Test-Path $nuitkaDist) { Rename-Item -Path $nuitkaDist -NewName "codename-generator" }
 

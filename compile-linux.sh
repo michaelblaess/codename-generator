@@ -18,13 +18,6 @@ init_py="$root/src/codename_generator/__init__.py"
 out_dir="$root/dist"
 dist_dir="$out_dir/codename-generator"
 
-# venv-Python bevorzugen, sonst System-Python
-if [ -x "$root/.venv/bin/python" ]; then
-    python="$root/.venv/bin/python"
-else
-    python="python3"
-fi
-
 # Build-Tools pruefen, bevor Nuitka mittendrin abbricht
 for tool in gcc patchelf; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -32,6 +25,24 @@ for tool in gcc patchelf; do
         exit 1
     fi
 done
+
+# venv mit dem Lockfile abgleichen, damit Nuitka keine veralteten
+# (Git-)Dependencies einkompiliert. --inexact laesst Extra-Pakete wie das
+# ad-hoc installierte nuitka unangetastet. Vor der $python-Ermittlung, damit
+# bei frischem Checkout (CI) ueberhaupt eine .venv existiert.
+if command -v uv >/dev/null 2>&1; then
+    echo "Syncing venv to lockfile (uv sync --inexact)..."
+    uv sync --inexact --project "$root"
+else
+    echo "uv nicht gefunden - venv-Sync uebersprungen" >&2
+fi
+
+# venv-Python bevorzugen, sonst System-Python
+if [ -x "$root/.venv/bin/python" ]; then
+    python="$root/.venv/bin/python"
+else
+    python="python3"
+fi
 
 # Version aus __init__.py lesen, damit nichts driftet
 # (portables sed - 'grep -oP' gibt es auf dem BSD-grep von macOS nicht)
@@ -50,7 +61,7 @@ started=$(date +%s)
 
 # --standalone        : self-contained, kein Python auf dem Zielrechner noetig
 # --remove-output     : C-/Objekt-Zwischendateien nach dem Build aufraeumen
-# --include-package-data : data/themes/*.yaml + data/modifiers/*.yaml mitnehmen
+# --include-package-data=codename_generator : data/themes/*.yaml mitnehmen
 "$python" -m nuitka \
     --standalone \
     --assume-yes-for-downloads \
@@ -61,7 +72,7 @@ started=$(date +%s)
     --output-filename=codename-generator \
     "$entry"
 
-# Nuitka benennt den dist-Ordner nach dem Hauptmodul (cli.dist) - umbenennen
+# Nuitka benennt den dist-Ordner nach dem Entry-Skript (cli.dist) - umbenennen
 if [ -d "$out_dir/cli.dist" ]; then
     mv "$out_dir/cli.dist" "$dist_dir"
 fi
