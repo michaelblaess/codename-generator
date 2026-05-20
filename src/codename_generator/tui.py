@@ -711,14 +711,18 @@ class CodenameApp(App[None]):
         return None
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        self._switch_theme(event.item.id or "")
+        # Explizite Auswahl (Klick / Enter) - bei leerem Seed Dialog oeffnen.
+        self._switch_theme(event.item.id or "", allow_dialog=True)
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        # Reine Cursor-Bewegung (Pfeiltasten, oder gleichzeitig mit Klick) -
+        # darf NICHT den Seed-Dialog oeffnen, sonst stapeln sich zwei Dialoge
+        # uebereinander, weil ein Klick beide Events feuert.
         if event.item is None:
             return
-        self._switch_theme(event.item.id or "")
+        self._switch_theme(event.item.id or "", allow_dialog=False)
 
-    def _switch_theme(self, item_id: str) -> None:
+    def _switch_theme(self, item_id: str, *, allow_dialog: bool = True) -> None:
         # Virtueller "Favorites"-Eintrag - rechts die Favoriten anzeigen.
         if item_id == self.FAVORITES_ITEM_ID:
             if not self._favorites_mode:
@@ -730,7 +734,7 @@ class CodenameApp(App[None]):
             return
         # Virtueller "Custom Seed"-Eintrag - Eingabe abfragen, dann rendern.
         if item_id == self.CUSTOM_SEED_ITEM_ID:
-            self._enter_seed_mode()
+            self._enter_seed_mode(allow_dialog=allow_dialog)
             return
         if not item_id.startswith("theme-"):
             return
@@ -754,11 +758,17 @@ class CodenameApp(App[None]):
         self._ensure_recipes()
         self._rerender()
 
-    def _enter_seed_mode(self) -> None:
-        """Wechselt in den Custom-Seed-Mode - bei leerem Seed sofort der Eingabedialog."""
+    def _enter_seed_mode(self, *, allow_dialog: bool = True) -> None:
+        """Wechselt in den Custom-Seed-Mode - bei leerem Seed der Eingabedialog.
+
+        `allow_dialog=False` schaltet das automatische Oeffnen des Dialogs ab.
+        Wird vom Highlight-Handler verwendet, damit ein Klick (der zugleich
+        Highlight + Select feuert) keine zwei gestapelten Dialoge erzeugt.
+        """
         self._favorites_mode = False
         if not self._custom_seed:
-            self.action_edit_seed()
+            if allow_dialog:
+                self.action_edit_seed()
             return
         if not self._seed_mode:
             self._seed_mode = True
@@ -792,6 +802,10 @@ class CodenameApp(App[None]):
 
     def action_edit_seed(self) -> None:
         """Oeffnet den Eingabedialog fuer den Custom Seed."""
+        # Doppelschutz: falls bereits ein Modal offen ist (z.B. der Dialog
+        # selbst), nicht erneut pushen - sonst stapeln sich zwei.
+        if len(self.screen_stack) > 1:
+            return
         self.push_screen(
             TextInputScreen(
                 title="Custom Seed",
