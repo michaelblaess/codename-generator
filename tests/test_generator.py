@@ -228,6 +228,48 @@ def test_seeded_theme_has_seed_word() -> None:
     assert theme.mutate is True
 
 
+def test_agents_modifier_pool_loaded() -> None:
+    """data/modifiers/agents.yaml wird als Pool 'agents' geladen."""
+    gen = Generator.load(seed=0)
+    assert "agents" in gen.modifiers
+    agents = set(w.lower() for w in gen.modifiers["agents"].words)
+    # Spot-Check: ein paar typische Agent-Nouns muessen drin sein.
+    for word in ("runner", "generator", "inspector", "fixer", "crawler"):
+        assert word in agents, f"expected '{word}' in agents pool"
+
+
+def test_theme_agent_pattern_produces_theme_agent_combinations() -> None:
+    """word_count=2 zieht mit nicht-trivialer Wahrscheinlichkeit THEME_AGENT."""
+    gen = Generator.load(seed=3)
+    seed = "Sitemap"
+    theme = gen.seeded_theme(seed)
+    recipes = gen.generate_seeded_recipes(seed, count=80)
+    suggestions = [gen.render(r, theme, word_count=2, mutation_chance=0.0) for r in recipes]
+    agent_suggestions = [s for s in suggestions if s.pattern is Pattern.THEME_AGENT]
+    assert agent_suggestions, "expected at least one theme-agent suggestion in 80 draws"
+    # Beispiel-Check: ein Agent-Vorschlag hat die Form "Sitemap <Agent>".
+    sample = agent_suggestions[0]
+    parts = sample.name.split()
+    assert len(parts) == 2
+    assert parts[0].lower() == seed.lower()
+
+
+def test_theme_agent_falls_back_to_verb_when_agent_pool_missing() -> None:
+    """Ohne agents-Pool fallback auf VERB - kein leerer Wortteil im Namen."""
+    gen = Generator.load(seed=3)
+    # agents-Pool gezielt entfernen.
+    gen.modifiers.pop("agents", None)
+    seed = "Sitemap"
+    theme = gen.seeded_theme(seed)
+    recipes = gen.generate_seeded_recipes(seed, count=30)
+    suggestions = [gen.render(r, theme, word_count=2, mutation_chance=0.0) for r in recipes]
+    for s in suggestions:
+        # Kein Namen darf einen doppelten Whitespace haben oder mit einem Space enden.
+        assert "  " not in s.name, f"double space in: {s.name!r}"
+        assert not s.name.endswith(" "), f"trailing space in: {s.name!r}"
+        assert s.slug.strip("-") == s.slug, f"slug has leading/trailing dash: {s.slug!r}"
+
+
 def test_random_theme_exists_and_pools_words() -> None:
     gen = Generator.load(seed=0)
     assert "random" in gen.themes

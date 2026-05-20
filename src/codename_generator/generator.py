@@ -19,6 +19,7 @@ class Pattern(StrEnum):
     ADJ_THEME = "adj-theme"
     VERB_THEME = "verb-theme"
     THEME_VERB = "theme-verb"
+    THEME_AGENT = "theme-agent"
     THEME_ONLY = "theme"
     ADJ_THEME_VERB = "adj-theme-verb"
 
@@ -29,10 +30,18 @@ PATTERN_WORD_COUNT: dict[Pattern, int] = {
     Pattern.ADJ_THEME: 2,
     Pattern.VERB_THEME: 2,
     Pattern.THEME_VERB: 2,
+    Pattern.THEME_AGENT: 2,
     Pattern.ADJ_THEME_VERB: 3,
 }
 
-_TWO_WORD_PATTERNS = (Pattern.ADJ_THEME, Pattern.VERB_THEME, Pattern.THEME_VERB)
+# Zwei-Wort-Patterns, aus denen `_select_pattern` zufaellig waehlt.
+# Agent-Suffix gehoert dazu - typische Tool-Naming-Konvention (Sitemap Runner).
+_TWO_WORD_PATTERNS = (
+    Pattern.ADJ_THEME,
+    Pattern.VERB_THEME,
+    Pattern.THEME_VERB,
+    Pattern.THEME_AGENT,
+)
 
 
 @dataclass(frozen=True)
@@ -47,6 +56,7 @@ class Recipe:
     theme_word: str
     adjective: str
     verb: str
+    agent: str
     pattern_index: int
     mutation_roll: float
     mutation_seed: int
@@ -73,7 +83,7 @@ def _compose_name(pattern: Pattern, theme_word: str, modifiers: tuple[str, ...])
     mods = list(modifiers)
     if pattern == Pattern.THEME_ONLY:
         return theme_word
-    if pattern == Pattern.THEME_VERB:
+    if pattern in (Pattern.THEME_VERB, Pattern.THEME_AGENT):
         return f"{theme_word} {mods[0]}" if mods else theme_word
     if pattern == Pattern.ADJ_THEME_VERB:
         if len(mods) >= 2:
@@ -128,21 +138,26 @@ class Generator:
         Anders als `generate_recipes` ist das Theme-Wort vom Benutzer
         vorgegeben (z.B. "Sitemap") - nicht zufaellig aus einer Wortliste.
         Damit alle Vorschlaege trotz gleichen Theme-Worts unterschiedlich
-        sind, wird auf der Kombination (adjective, verb, pattern_index)
+        sind, wird auf der Kombination (adjective, verb, agent, pattern_index)
         dedupliziert. Modifier kommen aus den globalen Pools.
         """
         adjectives = self.modifiers["adjectives"].words
         verbs = self.modifiers["verbs"].words
+        agents = self._agent_pool()
         recipes: list[Recipe] = []
-        seen: set[tuple[str, str, int]] = set()
+        seen: set[tuple[str, str, str, int]] = set()
         attempts = 0
         max_attempts = count * 40
+        # Anzahl der Patterns, aus denen gezogen wird - korrespondiert mit
+        # _TWO_WORD_PATTERNS in _select_pattern.
+        pattern_choices = len(_TWO_WORD_PATTERNS)
         while len(recipes) < count and attempts < max_attempts:
             attempts += 1
             adjective = self.rng.choice(adjectives)
             verb = self.rng.choice(verbs)
-            pattern_index = self.rng.randrange(3)
-            key = (adjective.lower(), verb.lower(), pattern_index)
+            agent = self.rng.choice(agents) if agents else ""
+            pattern_index = self.rng.randrange(pattern_choices)
+            key = (adjective.lower(), verb.lower(), agent.lower(), pattern_index)
             if key in seen:
                 continue
             seen.add(key)
@@ -151,12 +166,18 @@ class Generator:
                     theme_word=seed,
                     adjective=adjective,
                     verb=verb,
+                    agent=agent,
                     pattern_index=pattern_index,
                     mutation_roll=self.rng.random(),
                     mutation_seed=self.rng.randrange(_SEED_CEILING),
                 )
             )
         return recipes
+
+    def _agent_pool(self) -> tuple[str, ...]:
+        """Globaler Agent-Pool aus modifiers/agents.yaml (oder leer wenn fehlt)."""
+        agents_list = self.modifiers.get("agents")
+        return agents_list.words if agents_list else ()
 
     def seeded_theme(self, seed: str) -> WordList:
         """Erzeugt ein virtuelles WordList fuer das Custom-Seed-Theme.
@@ -179,10 +200,12 @@ class Generator:
         theme = self.themes[theme_slug]
         adjectives = theme.adjectives or self.modifiers["adjectives"].words
         verbs = theme.verbs or self.modifiers["verbs"].words
+        agents = self._agent_pool()
         recipes: list[Recipe] = []
         seen: set[str] = set()
         attempts = 0
         max_attempts = count * 40
+        pattern_choices = len(_TWO_WORD_PATTERNS)
         while len(recipes) < count and attempts < max_attempts:
             attempts += 1
             theme_word = self.rng.choice(theme.words)
@@ -195,7 +218,8 @@ class Generator:
                     theme_word=theme_word,
                     adjective=self.rng.choice(adjectives),
                     verb=self.rng.choice(verbs),
-                    pattern_index=self.rng.randrange(3),
+                    agent=self.rng.choice(agents) if agents else "",
+                    pattern_index=self.rng.randrange(pattern_choices),
                     mutation_roll=self.rng.random(),
                     mutation_seed=self.rng.randrange(_SEED_CEILING),
                 )
@@ -258,6 +282,15 @@ class Generator:
             case Pattern.THEME_VERB:
                 name = f"{rendered} {recipe.verb}"
                 sources = (recipe.theme_word, recipe.verb)
+            case Pattern.THEME_AGENT:
+                # Agent-Pool kann leer sein (agents.yaml fehlt) - dann auf
+                # THEME_VERB ausweichen, statt einen Leerstring anzuhaengen.
+                if recipe.agent:
+                    name = f"{rendered} {recipe.agent}"
+                    sources = (recipe.theme_word, recipe.agent)
+                else:
+                    name = f"{rendered} {recipe.verb}"
+                    sources = (recipe.theme_word, recipe.verb)
             case Pattern.THEME_ONLY:
                 name = rendered
                 sources = (recipe.theme_word,)
