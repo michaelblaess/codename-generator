@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 from datetime import datetime
 from typing import ClassVar
@@ -18,11 +19,13 @@ from textual_widgets import (
     ContextMenuItem,
     ContextMenuScreen,
     HorizontalSplitter,
+    TextInputScreen,
     VerticalSplitter,
 )
 
 from codename_generator import __author__, __version__, __year__
 from codename_generator.generator import (
+    CUSTOM_SEED_SLUG,
     RANDOM_THEME_SLUG,
     Generator,
     Pattern,
@@ -32,6 +35,13 @@ from codename_generator.generator import (
 from codename_generator.settings import JsonSettingsStore
 
 _DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
+
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify_name(text: str) -> str:
+    """Erzeugt einen Slug aus einem freien Text (kleinbuchstaben, Bindestriche)."""
+    return _SLUG_RE.sub("-", text.lower()).strip("-")
 
 
 class SuggestionsTable(DataTable[str]):
@@ -186,6 +196,10 @@ class AboutScreen(ModalScreen[None]):
         text.append("favorite\n        ")
         text.append("v ", style="bold")
         text.append("view favs  ")
+        text.append("i ", style="bold")
+        text.append("idea seed  ")
+        text.append("+ ", style="bold")
+        text.append("add idea\n        ")
         text.append("a ", style="bold")
         text.append("about  ")
         text.append("q ", style="bold")
@@ -238,6 +252,10 @@ class CodenameApp(App[None]):
         color: $warning;
         text-style: bold;
     }
+    #seed-theme Static {
+        color: $warning;
+        text-style: bold;
+    }
     #settings-pane {
         height: auto;
         padding: 1 2;
@@ -279,6 +297,8 @@ class CodenameApp(App[None]):
         Binding("t,T", "cycle_theme", "Theme", key_display="t"),
         Binding("f,F", "toggle_favorite", "Fav", key_display="f"),
         Binding("v,V", "open_favorites", "View favs", key_display="v"),
+        Binding("i,I", "edit_seed", "Idea seed", key_display="i"),
+        Binding("plus", "add_custom_favorite", "Add idea", key_display="+"),
         Binding("a,A", "about", "About", key_display="a"),
         Binding("q,Q", "quit", "Quit", key_display="q"),
     ]
@@ -290,6 +310,8 @@ class CodenameApp(App[None]):
     DEFAULT_THEME: ClassVar[str] = "textual-dark"
     # ListItem-ID des virtuellen "Favorites"-Eintrags in der Theme-Liste.
     FAVORITES_ITEM_ID: ClassVar[str] = "fav-theme"
+    # ListItem-ID des virtuellen "Custom Seed"-Eintrags in der Theme-Liste.
+    CUSTOM_SEED_ITEM_ID: ClassVar[str] = "seed-theme"
 
     def __init__(self) -> None:
         super().__init__()
@@ -304,12 +326,15 @@ class CodenameApp(App[None]):
         self._recipes: dict[str, list[Recipe]] = {}
         # Favoriten-Ansicht: rechts die Favoriten statt generierter Vorschlaege.
         self._favorites_mode = False
+        # Custom-Seed-Ansicht: rechts Varianten eines vom User eingegebenen Worts.
+        self._seed_mode = False
 
         settings = self._settings_store.load()
         self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
         self.word_count = self._coerce_words(settings.get("word_count"))
         self.suggestion_count = self._coerce_count(settings.get("suggestion_count"))
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
+        self._custom_seed = str(settings.get("custom_seed", "")).strip()
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
     @staticmethod
@@ -385,6 +410,7 @@ class CodenameApp(App[None]):
                 "word_count": self.word_count,
                 "suggestion_count": self.suggestion_count,
                 "favorites": self._serialize_favorites(),
+                "custom_seed": self._custom_seed,
             }
         )
 
@@ -397,10 +423,13 @@ class CodenameApp(App[None]):
         self._save_settings()
 
     def _theme_items(self) -> list[ListItem]:
-        """Baut die Theme-Listeneintraege - Favoriten zuoberst, dann die Themes."""
+        """Baut die Theme-Listeneintraege - Favorites + Custom Seed oben, dann die Themes."""
         fav_item = ListItem(Static("Favorites"), id=self.FAVORITES_ITEM_ID)
         fav_item.tooltip = "Your saved codenames"
-        items: list[ListItem] = [fav_item]
+        seed_label = f"Custom Seed: {self._custom_seed}" if self._custom_seed else "Custom Seed"
+        seed_item = ListItem(Static(seed_label), id=self.CUSTOM_SEED_ITEM_ID)
+        seed_item.tooltip = "Combine your own word with adjectives and verbs"
+        items: list[ListItem] = [fav_item, seed_item]
         for slug in self.theme_slugs:
             theme = self.generator.themes[slug]
             item = ListItem(Static(theme.name), id=f"theme-{slug}")
@@ -465,8 +494,8 @@ class CodenameApp(App[None]):
         self.title = "codename-generator"
         self.sub_title = self.theme_slug
         list_view = self.query_one("#theme-list", ListView)
-        # Index 0 ist der Favoriten-Eintrag - Start auf dem ersten echten Theme.
-        list_view.index = 1
+        # Indizes 0/1 sind Favorites/Custom Seed - Start auf dem ersten echten Theme.
+        list_view.index = 2
         self._log_event(f"started - theme [b]{self.theme_slug}[/b]")
         self._ensure_recipes()
         self._rerender()
@@ -482,6 +511,9 @@ class CodenameApp(App[None]):
     def _update_info(self) -> None:
         if self._favorites_mode:
             self._update_favorites_info()
+            return
+        if self._seed_mode:
+            self._update_seed_info()
             return
         theme = self.generator.themes[self.theme_slug]
         info = self.query_one("#info", Static)
@@ -519,6 +551,29 @@ class CodenameApp(App[None]):
         count_label.set_class(False, "locked")
         count_label.update(f"Suggestions: [b]{self.suggestion_count}[/b]")
 
+    def _update_seed_info(self) -> None:
+        """Info-Zeile und Slider-Status fuer die Custom-Seed-Ansicht.
+
+        Alle drei Slider gelten (Mutation/Wortzahl/Vorschlagsanzahl) - genauso
+        wie bei einem normalen Theme. Theme-spezifische Sperren entfallen.
+        """
+        self.query_one("#info", Static).update(
+            f"[b]Custom Seed[/b]  [dim]your idea \"{self._custom_seed}\" combined with "
+            "adjectives and verbs - press [b]i[/b] to change[/dim]"
+        )
+        mut_label = self.query_one("#mutation-label", Static)
+        wc_label = self.query_one("#wordcount-label", Static)
+        count_label = self.query_one("#count-label", Static)
+        self.query_one("#mutation-slider", Slider).disabled = False
+        self.query_one("#wordcount-slider", Slider).disabled = False
+        self.query_one("#count-slider", Slider).disabled = False
+        mut_label.set_class(False, "locked")
+        wc_label.set_class(False, "locked")
+        count_label.set_class(False, "locked")
+        mut_label.update(f"Mutation: [b]{self.mutation_percent}%[/b]")
+        wc_label.update(f"Words: [b]{self.word_count}[/b]")
+        count_label.update(f"Suggestions: [b]{self.suggestion_count}[/b]")
+
     def _update_favorites_info(self) -> None:
         """Info-Zeile und Slider-Sperren fuer die Favoriten-Ansicht.
 
@@ -549,8 +604,20 @@ class CodenameApp(App[None]):
                 self.theme_slug, count=self.suggestion_count
             )
 
+    def _ensure_seed_recipes(self) -> None:
+        """Erzeugt Recipes fuer den aktuellen Custom-Seed, falls noch keine im Cache."""
+        if self._custom_seed and CUSTOM_SEED_SLUG not in self._recipes:
+            self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
+                self._custom_seed, count=self.suggestion_count
+            )
+
     def _fresh_recipes(self) -> None:
-        """Verwirft die Recipes des aktuellen Themes und erzeugt neue."""
+        """Verwirft die Recipes des aktuellen Themes/Seeds und erzeugt neue."""
+        if self._seed_mode and self._custom_seed:
+            self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
+                self._custom_seed, count=self.suggestion_count
+            )
+            return
         if self.theme_slug:
             self._recipes[self.theme_slug] = self.generator.generate_recipes(
                 self.theme_slug, count=self.suggestion_count
@@ -564,6 +631,9 @@ class CodenameApp(App[None]):
         """
         if self._favorites_mode:
             self._render_favorites()
+            return
+        if self._seed_mode:
+            self._render_seeded()
             return
         if not self.theme_slug:
             return
@@ -583,6 +653,31 @@ class CodenameApp(App[None]):
                 s.pattern.value,
                 "*" if s.mutated else "",
             )
+        self._update_info()
+
+    def _render_seeded(self) -> None:
+        """Rendert die Custom-Seed-Recipes mit aktueller Mutation/Wortzahl."""
+        if not self._custom_seed:
+            return
+        theme = self.generator.seeded_theme(self._custom_seed)
+        mutation = self.mutation_percent / 100.0
+        recipes = self._recipes.get(CUSTOM_SEED_SLUG, [])
+        self.suggestions = [
+            self.generator.render(r, theme, self.word_count, mutation) for r in recipes
+        ]
+        table = self.query_one("#suggestions", DataTable)
+        table.clear()
+        if not self.suggestions:
+            table.add_row("", "(no seed yet - press i)", "", "", "")
+        else:
+            for i, s in enumerate(self.suggestions, 1):
+                table.add_row(
+                    str(i),
+                    s.name,
+                    s.slug,
+                    s.pattern.value,
+                    "*" if s.mutated else "",
+                )
         self._update_info()
 
     def _render_favorites(self) -> None:
@@ -628,20 +723,26 @@ class CodenameApp(App[None]):
         if item_id == self.FAVORITES_ITEM_ID:
             if not self._favorites_mode:
                 self._favorites_mode = True
+                self._seed_mode = False
                 self.sub_title = "favorites"
                 self._log_event("viewing [b]favorites[/b]")
                 self._rerender()
+            return
+        # Virtueller "Custom Seed"-Eintrag - Eingabe abfragen, dann rendern.
+        if item_id == self.CUSTOM_SEED_ITEM_ID:
+            self._enter_seed_mode()
             return
         if not item_id.startswith("theme-"):
             return
         slug = item_id[len("theme-") :]
         if slug not in self.generator.themes:
             return
-        was_favorites = self._favorites_mode
+        was_special = self._favorites_mode or self._seed_mode
         self._favorites_mode = False
+        self._seed_mode = False
         if slug == self.theme_slug:
-            # Gleiche Theme - nur noetig, wenn wir aus der Favoriten-Ansicht kommen.
-            if was_favorites:
+            # Gleiche Theme - nur noetig, wenn wir aus einer Sonderansicht kommen.
+            if was_special:
                 self.sub_title = slug
                 self._rerender()
             return
@@ -651,6 +752,19 @@ class CodenameApp(App[None]):
         self._log_event(f"theme -> [b]{slug}[/b]")
         # Vorhandene Recipes des Themes bleiben erhalten (Cache).
         self._ensure_recipes()
+        self._rerender()
+
+    def _enter_seed_mode(self) -> None:
+        """Wechselt in den Custom-Seed-Mode - bei leerem Seed sofort der Eingabedialog."""
+        self._favorites_mode = False
+        if not self._custom_seed:
+            self.action_edit_seed()
+            return
+        if not self._seed_mode:
+            self._seed_mode = True
+            self.sub_title = f"seed: {self._custom_seed}"
+            self._log_event(f"seed mode [b]{self._custom_seed}[/b]")
+        self._ensure_seed_recipes()
         self._rerender()
 
     def _apply_theme_default_mutation(self) -> None:
@@ -669,9 +783,61 @@ class CodenameApp(App[None]):
         if self._favorites_mode:
             self.notify("Favorites can't be regenerated", severity="warning")
             return
+        if self._seed_mode and not self._custom_seed:
+            self.action_edit_seed()
+            return
         self._fresh_recipes()
         self._log_event("regenerated")
         self._rerender()
+
+    def action_edit_seed(self) -> None:
+        """Oeffnet den Eingabedialog fuer den Custom Seed."""
+        self.push_screen(
+            TextInputScreen(
+                title="Custom Seed",
+                prompt="Your idea (e.g. \"Sitemap\" or \"Link\"):",
+                initial=self._custom_seed,
+                placeholder="Sitemap",
+                validator=lambda s: None if s.strip() else "Please enter a word.",
+                lang="en",
+            ),
+            callback=self._on_seed_entered,
+        )
+
+    def _on_seed_entered(self, raw: str | None) -> None:
+        """Speichert den eingegebenen Seed und rendert die Vorschlaege."""
+        if raw is None:
+            # Abbruch - wenn vorher kein Seed existierte und der User noch
+            # nicht im Seed-Mode war, einfach nichts tun.
+            return
+        seed = raw.strip()
+        if not seed:
+            return
+        changed = seed != self._custom_seed
+        self._custom_seed = seed
+        if changed:
+            # Neuer Seed => alte Recipes verwerfen.
+            self._recipes.pop(CUSTOM_SEED_SLUG, None)
+            # Label in der Theme-Liste aktualisieren.
+            self._refresh_seed_label()
+        self._seed_mode = True
+        self._favorites_mode = False
+        self.sub_title = f"seed: {seed}"
+        self._log_event(f"seed -> [b]{seed}[/b]")
+        self._save_settings()
+        self._ensure_seed_recipes()
+        self._rerender()
+
+    def _refresh_seed_label(self) -> None:
+        """Aktualisiert den 'Custom Seed: <seed>'-Eintrag in der Theme-Liste."""
+        try:
+            seed_item = self.query_one(f"#{self.CUSTOM_SEED_ITEM_ID}", ListItem)
+        except Exception:
+            return
+        label = f"Custom Seed: {self._custom_seed}" if self._custom_seed else "Custom Seed"
+        for child in seed_item.query(Static):
+            child.update(label)
+            break
 
     def action_copy_slug(self) -> None:
         s = self._selected_suggestion()
@@ -692,7 +858,8 @@ class CodenameApp(App[None]):
         self._log_event(f"copied name [b]{s.name}[/b]")
 
     def action_bump_mutation(self) -> None:
-        if not self._favorites_mode and not self.generator.themes[self.theme_slug].mutate:
+        is_special = self._favorites_mode or self._seed_mode
+        if not is_special and not self.generator.themes[self.theme_slug].mutate:
             self.notify("Mutation is locked for this theme", severity="warning")
             return
         new_value = (self.mutation_percent + self.MUTATION_BUMP) % 105
@@ -728,6 +895,7 @@ class CodenameApp(App[None]):
             # geaendert, vorhandene Recipes passen nicht mehr.
             self._recipes.clear()
             self._ensure_recipes()
+            self._ensure_seed_recipes()
         else:
             return
         self._save_settings()
@@ -779,8 +947,69 @@ class CodenameApp(App[None]):
     def action_open_favorites(self) -> None:
         self.push_screen(FavoritesScreen(self.favorites))
 
+    def action_add_custom_favorite(self) -> None:
+        """Oeffnet einen Eingabedialog, um einen eigenen Namen als Favorit zu speichern."""
+        self.push_screen(
+            TextInputScreen(
+                title="Add custom idea",
+                prompt="Codename to save as favorite:",
+                placeholder="e.g. Sitemap Pioneer",
+                validator=self._validate_custom_favorite,
+                lang="en",
+            ),
+            callback=self._on_custom_favorite_entered,
+        )
+
+    def _validate_custom_favorite(self, raw: str) -> str | None:
+        """Pruefung fuer den Eingabedialog: nicht leer, kein Duplikat."""
+        text = raw.strip()
+        if not text:
+            return "Please enter a name."
+        slug = _slugify_name(text)
+        if not slug:
+            return "Name must contain at least one letter or digit."
+        if any(f.slug == slug for f in self.favorites):
+            return "A favorite with this name already exists."
+        return None
+
+    def _on_custom_favorite_entered(self, raw: str | None) -> None:
+        """Fuegt den eingegebenen Namen als Favorit hinzu und persistiert."""
+        if raw is None:
+            return
+        name = raw.strip()
+        if not name:
+            return
+        slug = _slugify_name(name)
+        if not slug:
+            return
+        suggestion = Suggestion(
+            name=name,
+            slug=slug,
+            pattern=Pattern.THEME_ONLY,
+            mutated=False,
+            source_words=(name,),
+        )
+        self.favorites.append(suggestion)
+        self.notify(f"Added favorite: {name}")
+        self._log_event(f"fav [b]{name}[/b]")
+        self._save_settings()
+        if self._favorites_mode:
+            self._rerender()
+        else:
+            self._update_info()
+
     def action_about(self) -> None:
         self.push_screen(AboutScreen())
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        """Blendet Aktionen im Footer aus, wenn sie im aktuellen Modus keinen Sinn ergeben."""
+        # ModalScreen-Isolation: bei offenem Modal alle App-Shortcuts abschalten.
+        if len(self.screen_stack) > 1:
+            return None
+        if action == "add_custom_favorite" and not self._favorites_mode:
+            # "+" gibt es nur in der Favoriten-Ansicht.
+            return None
+        return True
 
     def on_suggestions_table_right_clicked(
         self, event: SuggestionsTable.RightClicked
@@ -805,8 +1034,14 @@ class CodenameApp(App[None]):
                 shortcut="f",
             ),
         ]
-        # "Regenerate" gibt es nur fuer echte Themes, nicht in der Favoriten-Ansicht.
-        if not self._favorites_mode:
+        if self._favorites_mode:
+            # In der Favoriten-Ansicht: manuellen Idea-Eintrag hinzufuegen.
+            items.append(ContextMenuItem.separator())
+            items.append(
+                ContextMenuItem("add_custom_favorite", "Add custom idea...", shortcut="+")
+            )
+        else:
+            # "Regenerate" gibt es nur fuer echte Themes/Custom-Seed.
             items.append(ContextMenuItem.separator())
             items.append(ContextMenuItem("regenerate", "Regenerate all", shortcut="r"))
         self.push_screen(
@@ -824,6 +1059,8 @@ class CodenameApp(App[None]):
             self.action_toggle_favorite()
         elif action_id == "regenerate":
             self.action_regenerate()
+        elif action_id == "add_custom_favorite":
+            self.action_add_custom_favorite()
 
 
 def _reset_mouse_tracking() -> None:

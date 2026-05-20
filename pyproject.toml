@@ -1,6 +1,6 @@
 [project]
 name = "codename-generator"
-version = "0.2.2"
+version = "0.3.0"
 description = "Project codename generator with curated themes and phonetic mutations"
 readme = "README.md"
 license = "Apache-2.0"
@@ -42,7 +42,7 @@ Repository = "https://github.com/michaelblaess/codename-generator"
 Issues = "https://github.com/michaelblaess/codename-generator/issues"
 
 [tool.uv.sources]
-textual-widgets = { git = "https://github.com/michaelblaess/textual-widgets.git", tag = "v0.8.0" }
+textual-widgets = { git = "https://github.com/michaelblaess/textual-widgets.git", tag = "v0.21.0" }
 textual-themes = { git = "https://github.com/michaelblaess/textual-themes.git", tag = "v0.2.1" }
 
 [dependency-groups]

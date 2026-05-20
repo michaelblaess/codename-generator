@@ -169,7 +169,7 @@ wheels = [
 
 [[package]]
 name = "codename-generator"
-version = "0.2.2"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },
@@ -194,7 +194,7 @@ requires-dist = [
     { name = "textual", specifier = ">=0.83" },
     { name = "textual-slider", specifier = ">=0.1.0" },
     { name = "textual-themes", git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.2.1" },
-    { name = "textual-widgets", git = "https://github.com/michaelblaess/textual-widgets.git?tag=v0.8.0" },
+    { name = "textual-widgets", git = "https://github.com/michaelblaess/textual-widgets.git?tag=v0.21.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -913,8 +913,8 @@ dependencies = [
 
 [[package]]
 name = "textual-widgets"
-version = "0.8.0"
-source = { git = "https://github.com/michaelblaess/textual-widgets.git?tag=v0.8.0#aeb54b5c8005d2c91b0ed2df0a5f9189c44182f5" }
+version = "0.21.0"
+source = { git = "https://github.com/michaelblaess/textual-widgets.git?tag=v0.21.0#020839ceaf4dc6985f3a997b73e5e253a4a81986" }
 dependencies = [
     { name = "rich" },
     { name = "textual" },

@@ -10,6 +10,7 @@ from codename_generator.phonetic import mutate
 from codename_generator.wordlist import WordList, load_modifiers, load_themes
 
 RANDOM_THEME_SLUG = "random"
+CUSTOM_SEED_SLUG = "custom-seed"
 _MUTATION_RETRIES = 5
 _SEED_CEILING = 2**31
 
@@ -119,6 +120,56 @@ class Generator:
             themes=themes_with_random,
             modifiers=load_modifiers(),
             rng=random.Random(seed),
+        )
+
+    def generate_seeded_recipes(self, seed: str, count: int = 30) -> list[Recipe]:
+        """Erzeugt `count` Recipes mit einem festen `seed` als Theme-Wort.
+
+        Anders als `generate_recipes` ist das Theme-Wort vom Benutzer
+        vorgegeben (z.B. "Sitemap") - nicht zufaellig aus einer Wortliste.
+        Damit alle Vorschlaege trotz gleichen Theme-Worts unterschiedlich
+        sind, wird auf der Kombination (adjective, verb, pattern_index)
+        dedupliziert. Modifier kommen aus den globalen Pools.
+        """
+        adjectives = self.modifiers["adjectives"].words
+        verbs = self.modifiers["verbs"].words
+        recipes: list[Recipe] = []
+        seen: set[tuple[str, str, int]] = set()
+        attempts = 0
+        max_attempts = count * 40
+        while len(recipes) < count and attempts < max_attempts:
+            attempts += 1
+            adjective = self.rng.choice(adjectives)
+            verb = self.rng.choice(verbs)
+            pattern_index = self.rng.randrange(3)
+            key = (adjective.lower(), verb.lower(), pattern_index)
+            if key in seen:
+                continue
+            seen.add(key)
+            recipes.append(
+                Recipe(
+                    theme_word=seed,
+                    adjective=adjective,
+                    verb=verb,
+                    pattern_index=pattern_index,
+                    mutation_roll=self.rng.random(),
+                    mutation_seed=self.rng.randrange(_SEED_CEILING),
+                )
+            )
+        return recipes
+
+    def seeded_theme(self, seed: str) -> WordList:
+        """Erzeugt ein virtuelles WordList fuer das Custom-Seed-Theme.
+
+        Das Theme hat nur das Seed-Wort als Inhalt; Pattern und Mutation
+        bleiben offen (gesteuert von den Slidern). Wird vom TUI in
+        `Generator.render()` als `theme`-Argument uebergeben.
+        """
+        return WordList(
+            slug=CUSTOM_SEED_SLUG,
+            name=f"Custom Seed: {seed}",
+            description="your idea combined with adjectives and verbs",
+            words=(seed,),
         )
 
     def generate_recipes(self, theme_slug: str, count: int = 30) -> list[Recipe]:
