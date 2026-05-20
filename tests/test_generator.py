@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from codename_generator.generator import PATTERN_WORD_COUNT, Generator, Pattern
+from codename_generator.generator import (
+    CUSTOM_SEED_SLUG,
+    PATTERN_WORD_COUNT,
+    Generator,
+    Pattern,
+)
 from codename_generator.wordlist import WordList
 
 
@@ -181,6 +186,46 @@ def test_theme_modifier_override_uses_own_verbs() -> None:
         if s.pattern in verb_patterns:
             modifier = s.source_words[1].lower()
             assert modifier in dev_verbs, f"dev verb expected: {s}"
+
+
+def test_seeded_recipes_use_seed_as_theme_word() -> None:
+    """Alle Recipes haben den uebergebenen Seed als theme_word."""
+    gen = Generator.load(seed=7)
+    recipes = gen.generate_seeded_recipes("Sitemap", count=30)
+    assert len(recipes) == 30
+    for recipe in recipes:
+        assert recipe.theme_word == "Sitemap"
+
+
+def test_seeded_recipes_yield_distinct_combinations() -> None:
+    """Trotz gleichem theme_word ist jedes Recipe einzigartig (adj/verb/pattern)."""
+    gen = Generator.load(seed=7)
+    recipes = gen.generate_seeded_recipes("Sitemap", count=30)
+    keys = {(r.adjective.lower(), r.verb.lower(), r.pattern_index) for r in recipes}
+    assert len(keys) == len(recipes), "expected all recipes to have distinct combos"
+
+
+def test_seeded_render_produces_varied_names() -> None:
+    """Die gerenderten Vorschlaege fuer einen Seed sind sichtbar verschieden."""
+    gen = Generator.load(seed=7)
+    seed = "Sitemap"
+    theme = gen.seeded_theme(seed)
+    recipes = gen.generate_seeded_recipes(seed, count=20)
+    suggestions = [gen.render(r, theme, word_count=2, mutation_chance=0.0) for r in recipes]
+    names = {s.name for s in suggestions}
+    # Bei word_count=2 muessen sich die Namen durch die Modifier unterscheiden.
+    assert len(names) >= 15, f"expected variety in seeded suggestions, got {len(names)}"
+    # Der Seed kommt in jedem Namen vor (case-insensitive).
+    for s in suggestions:
+        assert seed.lower() in s.name.lower(), f"seed missing in name: {s.name}"
+
+
+def test_seeded_theme_has_seed_word() -> None:
+    gen = Generator.load(seed=0)
+    theme = gen.seeded_theme("Sitemap")
+    assert theme.slug == CUSTOM_SEED_SLUG
+    assert theme.words == ("Sitemap",)
+    assert theme.mutate is True
 
 
 def test_random_theme_exists_and_pools_words() -> None:
