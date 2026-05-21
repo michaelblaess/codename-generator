@@ -12,7 +12,16 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Click
 from textual.message import Message
 from textual.screen import ModalScreen
-from textual.widgets import DataTable, Footer, Header, ListItem, ListView, RichLog, Static
+from textual.widgets import (
+    DataTable,
+    Footer,
+    Header,
+    ListItem,
+    ListView,
+    RichLog,
+    Select,
+    Static,
+)
 from textual_slider import Slider
 from textual_themes import register_all
 from textual_widgets import (
@@ -24,6 +33,7 @@ from textual_widgets import (
 )
 
 from codename_generator import __author__, __version__, __year__
+from codename_generator.effects import EFFECT_NONE, EFFECTS, is_valid_effect, play_effect
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
     RANDOM_THEME_SLUG,
@@ -276,6 +286,10 @@ class CodenameApp(App[None]):
         width: 1fr;
         margin-bottom: 1;
     }
+    #effect-select {
+        width: 1fr;
+        margin-bottom: 1;
+    }
     #suggestions {
         height: 1fr;
     }
@@ -335,6 +349,7 @@ class CodenameApp(App[None]):
         self.suggestion_count = self._coerce_count(settings.get("suggestion_count"))
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._custom_seed = str(settings.get("custom_seed", "")).strip()
+        self._effect_name = self._coerce_effect(settings.get("effect"))
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
     @staticmethod
@@ -367,6 +382,13 @@ class CodenameApp(App[None]):
         except (TypeError, ValueError):
             return CodenameApp.SUGGESTION_COUNT_DEFAULT
         return max(10, min(40, value - (value % 10)))
+
+    @staticmethod
+    def _coerce_effect(raw: object) -> str:
+        """Normalisiert den Effekt-Key auf einen bekannten Slug oder 'none'."""
+        if not isinstance(raw, str):
+            return EFFECT_NONE
+        return raw if is_valid_effect(raw) else EFFECT_NONE
 
     @staticmethod
     def _deserialize_favorites(raw: object) -> list[Suggestion]:
@@ -411,6 +433,7 @@ class CodenameApp(App[None]):
                 "suggestion_count": self.suggestion_count,
                 "favorites": self._serialize_favorites(),
                 "custom_seed": self._custom_seed,
+                "effect": self._effect_name,
             }
         )
 
@@ -473,6 +496,13 @@ class CodenameApp(App[None]):
                         value=self.suggestion_count,
                         id="count-slider",
                         classes="settings-slider",
+                    )
+                    yield Static("Effect", id="effect-label", classes="settings-label")
+                    yield Select(
+                        [(label, key) for key, label in EFFECTS],
+                        value=self._effect_name,
+                        allow_blank=False,
+                        id="effect-select",
                     )
             yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
             with Vertical(id="right-pane"):
@@ -798,7 +828,51 @@ class CodenameApp(App[None]):
             return
         self._fresh_recipes()
         self._log_event("regenerated")
+        # Effekt zuerst spielen (vor _rerender), damit die animierten Namen
+        # genau den Namen entsprechen, die anschliessend in der Tabelle stehen.
+        self._play_regenerate_effect()
         self._rerender()
+
+    def _play_regenerate_effect(self) -> None:
+        """Spielt den ausgewaehlten tte-Effekt auf den frisch generierten Namen.
+
+        Berechnet die neuen Vorschlaege (ohne Tabellen-Update), reicht ihre
+        Namen an die tte-Animation und gibt das Terminal waehrend des Effekts
+        via `App.suspend()` frei - Textual rendert solange nicht.
+        """
+        if self._effect_name == EFFECT_NONE:
+            return
+        names = self._compute_current_names()
+        if not names:
+            return
+        text = "\n".join(names)
+        try:
+            with self.suspend():
+                play_effect(text, self._effect_name)
+        except Exception as exc:
+            # Effekte sind reines Eye-Candy - bei Fehlern still weiterlaufen,
+            # aber im Log hinterlassen, damit der User es findet.
+            self._log_event(f"[red]effect failed: {exc}[/red]")
+
+    def _compute_current_names(self) -> list[str]:
+        """Berechnet die Namen, die ein anschliessendes _rerender erzeugen wuerde.
+
+        Wir koennen nicht einfach die Tabelle abfragen - sie zeigt noch die
+        VORHERIGE Generation. Stattdessen rendern wir die aktuellen Recipes
+        einmal in Memory, ohne die Suggestion-Liste oder die Tabelle anzufassen.
+        """
+        if self._seed_mode and self._custom_seed:
+            theme = self.generator.seeded_theme(self._custom_seed)
+            recipes = self._recipes.get(CUSTOM_SEED_SLUG, [])
+        elif self.theme_slug:
+            theme = self.generator.themes[self.theme_slug]
+            recipes = self._recipes.get(self.theme_slug, [])
+        else:
+            return []
+        mutation = self.mutation_percent / 100.0
+        return [
+            self.generator.render(r, theme, self.word_count, mutation).name for r in recipes
+        ]
 
     def action_edit_seed(self) -> None:
         """Oeffnet den Eingabedialog fuer den Custom Seed."""
@@ -884,6 +958,17 @@ class CodenameApp(App[None]):
         self._log_event(f"mutation -> [b]{new_value}%[/b]")
         self._save_settings()
         self._rerender()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        """Verarbeitet die Auswahl im Effekt-Dropdown."""
+        if event.select.id != "effect-select":
+            return
+        new_value = str(event.value) if event.value is not None else EFFECT_NONE
+        if not is_valid_effect(new_value) or new_value == self._effect_name:
+            return
+        self._effect_name = new_value
+        self._log_event(f"effect -> [b]{new_value}[/b]")
+        self._save_settings()
 
     def on_slider_changed(self, event: Slider.Changed) -> None:
         new_value = int(event.value)
