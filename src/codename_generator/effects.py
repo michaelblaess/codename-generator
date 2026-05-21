@@ -90,6 +90,19 @@ def is_valid_effect(key: str) -> bool:
     return key in _VALID_KEYS
 
 
+# tte-Defaults sind fuer Desktop-Demos kalibriert - manche Effekte laufen
+# 10-15 Sekunden, was sich in einer interaktiven TUI wie "haengt" anfuehlt.
+# Hier kuerzen wir die Animationsdauer der bekannten Langläufer auf ein Mass,
+# das zur Regenerate-Aktion passt. Werte sind effect_config-Felder.
+_EFFECT_CONFIG_OVERRIDES: dict[str, dict[str, Any]] = {
+    "matrix": {"rain_time": 2},  # Default 15s -> 2s
+    "thunderstorm": {"storm_time": 3},  # Default 12s
+    "vhstape": {"total_glitch_time": 120},  # Default 600 Frames
+    "spotlights": {"search_duration": 180},  # Default 550 Frames
+    "rings": {"disperse_duration": 80, "spin_duration": 80},  # Default 200/200
+}
+
+
 def iter_effect_frames(
     text: str,
     key: str,
@@ -133,5 +146,7 @@ def iter_effect_frames(
             effect.terminal_config.canvas_width = canvas_width
         if canvas_height > 0:
             effect.terminal_config.canvas_height = canvas_height
+        for attr, value in _EFFECT_CONFIG_OVERRIDES.get(slug, {}).items():
+            setattr(effect.effect_config, attr, value)
         return iter(effect)
     return iter(())

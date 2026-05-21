@@ -331,6 +331,7 @@ class CodenameApp(App[None]):
         Binding("v,V", "open_favorites", "View favs", key_display="v"),
         Binding("i,I", "edit_seed", "Idea seed", key_display="i"),
         Binding("plus", "add_custom_favorite", "Add idea", key_display="+"),
+        Binding("escape", "stop_effect", "Stop effect", key_display="Esc"),
         Binding("a,A", "about", "About", key_display="a"),
         Binding("q,Q", "quit", "Quit", key_display="q"),
     ]
@@ -903,6 +904,8 @@ class CodenameApp(App[None]):
         display.remove_class("hidden")
         display.update("")
         self._effect_timer = self.set_interval(1 / 60, self._tick_effect)
+        # Footer neu rendern, damit das Esc-Binding sofort erscheint.
+        self.refresh_bindings()
 
     def _tick_effect(self) -> None:
         """Konsumiert FRAME_SKIP Frames und rendert den letzten ins Static.
@@ -939,6 +942,7 @@ class CodenameApp(App[None]):
 
     def _stop_effect(self) -> None:
         """Beendet eine laufende Effekt-Animation und stellt die Tabelle wieder her."""
+        was_running = self._effect_timer is not None
         if self._effect_timer is not None:
             self._effect_timer.stop()
             self._effect_timer = None
@@ -948,6 +952,9 @@ class CodenameApp(App[None]):
             self.query_one("#suggestions", DataTable).remove_class("hidden")
         except Exception:
             pass
+        if was_running:
+            # Esc-Binding aus dem Footer wieder entfernen.
+            self.refresh_bindings()
 
     def _compute_current_names(self) -> list[str]:
         """Berechnet die Namen, die ein anschliessendes _rerender erzeugen wuerde.
@@ -1203,7 +1210,17 @@ class CodenameApp(App[None]):
         if action == "add_custom_favorite" and not self._favorites_mode:
             # "+" gibt es nur in der Favoriten-Ansicht.
             return None
+        if action == "stop_effect" and self._effect_timer is None:
+            # Esc gibt es nur waehrend ein Effekt laeuft.
+            return None
         return True
+
+    def action_stop_effect(self) -> None:
+        """User-Abbruch eines laufenden tte-Effekts (Esc)."""
+        if self._effect_timer is None:
+            return
+        self._log_event("effect [b]aborted[/b]")
+        self._stop_effect()
 
     def on_suggestions_table_right_clicked(
         self, event: SuggestionsTable.RightClicked
