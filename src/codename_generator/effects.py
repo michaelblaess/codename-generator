@@ -90,7 +90,13 @@ def is_valid_effect(key: str) -> bool:
     return key in _VALID_KEYS
 
 
-def iter_effect_frames(text: str, key: str) -> Iterator[str]:
+def iter_effect_frames(
+    text: str,
+    key: str,
+    *,
+    canvas_width: int = -1,
+    canvas_height: int = -1,
+) -> Iterator[str]:
     """Liefert die rohe Frame-Iteration eines tte-Effekts fuer Inline-Rendering.
 
     Args:
@@ -100,6 +106,14 @@ def iter_effect_frames(text: str, key: str) -> Iterator[str]:
         key:
             Effekt-Slug aus `EFFECTS`. `EFFECT_NONE` liefert einen leeren
             Iterator (kein Frame).
+        canvas_width:
+            Optionale Canvas-Breite in Zellen. -1 bedeutet "an den Text
+            anpassen" (tte-Default). Werte > 0 zwingen tte, den Effekt
+            ueber die volle Breite zu spielen - bewegungsbasierte Effekte
+            (Matrix, Beams, Rain) profitieren davon, weil sie sonst nur
+            in der schmalen Text-Spalte stattfinden.
+        canvas_height:
+            Analog fuer die Hoehe.
 
     Returns:
         Iterator ueber Frame-Strings. Jeder Frame ist ein vollstaendiger
@@ -114,5 +128,10 @@ def iter_effect_frames(text: str, key: str) -> Iterator[str]:
         if slug != key:
             continue
         effect_cls = _load_effect_class(module_stem, class_name)
-        return iter(effect_cls(text))
+        effect = effect_cls(text)
+        if canvas_width > 0:
+            effect.terminal_config.canvas_width = canvas_width
+        if canvas_height > 0:
+            effect.terminal_config.canvas_height = canvas_height
+        return iter(effect)
     return iter(())

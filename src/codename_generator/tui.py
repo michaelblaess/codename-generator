@@ -340,6 +340,10 @@ class CodenameApp(App[None]):
     WORD_COUNT_DEFAULT: ClassVar[int] = 2
     SUGGESTION_COUNT_DEFAULT: ClassVar[int] = 30
     DEFAULT_THEME: ClassVar[str] = "textual-dark"
+    # Anzahl tte-Frames, die pro Tick konsumiert werden - nur der letzte wird
+    # gerendert. Ein Wert von 3 lasst die Animation 3x schneller wirken,
+    # ohne die Tick-Frequenz selbst hochzuziehen.
+    EFFECT_FRAME_SKIP: ClassVar[int] = 3
     # ListItem-ID des virtuellen "Favorites"-Eintrags in der Theme-Liste.
     FAVORITES_ITEM_ID: ClassVar[str] = "fav-theme"
     # ListItem-ID des virtuellen "Custom Seed"-Eintrags in der Theme-Liste.
@@ -864,50 +868,73 @@ class CodenameApp(App[None]):
         """Spielt den ausgewaehlten tte-Effekt inline in der TUI.
 
         Versteckt die DataTable, blendet einen Static-Overlay ein und animiert
-        die Frames per Timer (60 fps = tte's Default). tte-Frames sind reine
-        Text-Snapshots ohne Cursor-Positionierung - daher genuegt `Text.from_ansi`
-        pro Frame. Nach dem letzten Frame schaltet die Tabelle wieder ein.
+        die Frames per Timer. Die Canvas-Groesse wird an den verfuegbaren
+        Pane-Platz gekoppelt, damit bewegungsbasierte Effekte (Matrix, Beams,
+        Rain) die volle Breite nutzen statt nur in der schmalen Text-Spalte
+        zu stattfinden. Per Tick werden EFFECT_FRAME_SKIP Frames konsumiert
+        und nur der letzte gerendert - das beschleunigt die Animation um den
+        Faktor EFFECT_FRAME_SKIP, ohne die Tick-Frequenz hochzuziehen.
         """
         if self._effect_name == EFFECT_NONE:
             return
         names = self._compute_current_names()
         if not names:
             return
-        # Laufenden Effekt abbrechen, bevor wir einen neuen starten - sonst
-        # ueberlagern sich zwei Timer.
+        # Laufenden Effekt abbrechen, bevor wir einen neuen starten.
         self._stop_effect()
+        # Canvas-Groesse aus der noch sichtbaren Tabelle ableiten - sie hat
+        # exakt die Dimensionen, die das #effect-display gleich annehmen wird.
+        table = self.query_one("#suggestions", DataTable)
+        canvas_width = max(40, table.size.width - 2)
+        canvas_height = max(10, table.size.height - 1)
         try:
             text = "\n".join(names)
-            self._effect_iter = iter_effect_frames(text, self._effect_name)
+            self._effect_iter = iter_effect_frames(
+                text,
+                self._effect_name,
+                canvas_width=canvas_width,
+                canvas_height=canvas_height,
+            )
         except Exception as exc:
             self._log_event(f"[red]effect init failed: {exc}[/red]")
             return
-        self.query_one("#suggestions", DataTable).add_class("hidden")
+        table.add_class("hidden")
         display = self.query_one("#effect-display", Static)
         display.remove_class("hidden")
         display.update("")
         self._effect_timer = self.set_interval(1 / 60, self._tick_effect)
 
     def _tick_effect(self) -> None:
-        """Liest den naechsten Frame und aktualisiert das Static-Widget."""
+        """Konsumiert FRAME_SKIP Frames und rendert den letzten ins Static.
+
+        Frame-Skipping ist der Speed-Multiplikator: tte produziert seine
+        Animation in 1x-Geschwindigkeit, wir verwerfen die Zwischenframes.
+        """
         if self._effect_iter is None:
             self._stop_effect()
             return
-        try:
-            frame = next(self._effect_iter)  # type: ignore[call-overload]
-        except StopIteration:
-            self._stop_effect()
-            return
-        except Exception as exc:
-            self._log_event(f"[red]effect failed: {exc}[/red]")
-            self._stop_effect()
-            return
-        try:
-            display = self.query_one("#effect-display", Static)
-            display.update(Text.from_ansi(frame))
-        except Exception:
-            # Widget evtl. nicht mehr da (z.B. waehrend Layout-Wechsel) -
-            # Effekt sauber beenden.
+        last_frame: str | None = None
+        exhausted = False
+        for _ in range(self.EFFECT_FRAME_SKIP):
+            try:
+                last_frame = next(self._effect_iter)  # type: ignore[call-overload]
+            except StopIteration:
+                exhausted = True
+                break
+            except Exception as exc:
+                self._log_event(f"[red]effect failed: {exc}[/red]")
+                self._stop_effect()
+                return
+        if last_frame is not None:
+            try:
+                display = self.query_one("#effect-display", Static)
+                display.update(Text.from_ansi(last_frame))
+            except Exception:
+                # Widget evtl. nicht mehr da (z.B. waehrend Layout-Wechsel) -
+                # Effekt sauber beenden.
+                self._stop_effect()
+                return
+        if exhausted:
             self._stop_effect()
 
     def _stop_effect(self) -> None:
