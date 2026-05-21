@@ -17,7 +17,7 @@ Output demo/intro.gif
 Require uv
 
 # ---------- Set ----------
-Set Shell "pwsh"
+Set Shell "bash"
 Set FontSize 14
 Set Width 1400
 Set Height 900
@@ -29,23 +29,19 @@ Set WindowBar Colorful
 Set WindowBarSize 40
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 80ms
-Set FrameRate 60
 Set LoopOffset 5%
 Set CursorBlink false
 
 # ---------- Setup (unsichtbar) ----------
 Hide
-# UTF-8 erzwingen - sonst zerlegt es die Umlaute / Sonderzeichen.
-Type "$OutputEncoding = [System.Text.Encoding]::UTF8"
+Type "cd /mnt/c/Users/Michael/Repos/codename-generator"
 Enter
-Type "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8"
-Enter
-Type "cls"
+Type "clear"
 Enter
 Type "uv run codename"
 Enter
 # Warten bis die TUI sicher steht (Sidebar zeigt "Custom Seed").
-Wait /Custom Seed/
+Wait+Screen@30s /Custom Seed/
 Sleep 400ms
 Show
 
@@ -56,14 +52,14 @@ Sleep 1500ms
 
 # 2) Custom Seed "Sitemap" eingeben.
 Type@180ms "i"
-Wait /Your idea/
+Wait+Screen@10s /Your idea/
 Sleep 400ms
 # Eingabefeld kann mit altem Seed vorbefuellt sein - grosszuegig leeren.
 Backspace 30
 Type "Sitemap"
 Sleep 500ms
 Enter
-Wait /seed: Sitemap/
+Wait+Screen /seed: Sitemap/
 Sleep 2200ms
 
 # 3) Regenerate fuer eine andere Modifier-Kombination.
@@ -72,13 +68,13 @@ Sleep 2500ms
 
 # 4) Anderer Seed "Inspector" zum Vergleich.
 Type@180ms "i"
-Wait /Your idea/
+Wait+Screen@10s /Your idea/
 Sleep 400ms
 Backspace 30
 Type "Inspector"
 Sleep 500ms
 Enter
-Wait /seed: Inspector/
+Wait+Screen /seed: Inspector/
 Sleep 2500ms
 
 # 5) Einen Favoriten markieren (auf der ersten Zeile).
