@@ -1,0 +1,10 @@
+# Binary assets - kein LF/CRLF-Munging, kein Text-Diff.
+*.gif  binary
+*.mp4  binary
+*.webm binary
+*.png  binary
+*.jpg  binary
+*.ico  binary
+
+# VHS-Tapes sind Text - LF erzwingen.
+*.tape text eol=lf
