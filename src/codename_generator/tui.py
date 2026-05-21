@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import sys
-import time
 from datetime import datetime
 from typing import ClassVar
 
@@ -13,17 +12,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Click
 from textual.message import Message
 from textual.screen import ModalScreen
-from textual.timer import Timer
-from textual.widgets import (
-    DataTable,
-    Footer,
-    Header,
-    ListItem,
-    ListView,
-    RichLog,
-    Select,
-    Static,
-)
+from textual.widgets import DataTable, Footer, Header, ListItem, ListView, RichLog, Static
 from textual_slider import Slider
 from textual_themes import register_all
 from textual_widgets import (
@@ -35,12 +24,6 @@ from textual_widgets import (
 )
 
 from codename_generator import __author__, __version__, __year__
-from codename_generator.effects import (
-    EFFECT_NONE,
-    EFFECTS,
-    is_valid_effect,
-    iter_effect_frames,
-)
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
     RANDOM_THEME_SLUG,
@@ -293,24 +276,8 @@ class CodenameApp(App[None]):
         width: 1fr;
         margin-bottom: 1;
     }
-    #effect-select {
-        width: 1fr;
-        margin-bottom: 1;
-    }
     #suggestions {
         height: 1fr;
-    }
-    #effect-display {
-        height: 1fr;
-        background: $surface;
-        padding: 0 1;
-        overflow: hidden;
-    }
-    #effect-display.hidden {
-        display: none;
-    }
-    #suggestions.hidden {
-        display: none;
     }
     #log {
         height: 6;
@@ -332,7 +299,6 @@ class CodenameApp(App[None]):
         Binding("v,V", "open_favorites", "View favs", key_display="v"),
         Binding("i,I", "edit_seed", "Idea seed", key_display="i"),
         Binding("plus", "add_custom_favorite", "Add idea", key_display="+"),
-        Binding("escape", "stop_effect", "Stop effect", key_display="Esc"),
         Binding("a,A", "about", "About", key_display="a"),
         Binding("q,Q", "quit", "Quit", key_display="q"),
     ]
@@ -342,14 +308,6 @@ class CodenameApp(App[None]):
     WORD_COUNT_DEFAULT: ClassVar[int] = 2
     SUGGESTION_COUNT_DEFAULT: ClassVar[int] = 30
     DEFAULT_THEME: ClassVar[str] = "textual-dark"
-    # Anzahl tte-Frames, die pro Tick konsumiert werden - nur der letzte wird
-    # gerendert. Ein Wert von 3 lasst die Animation 3x schneller wirken,
-    # ohne die Tick-Frequenz selbst hochzuziehen.
-    EFFECT_FRAME_SKIP: ClassVar[int] = 3
-    # Hartes Cap fuer die maximale Spieldauer eines Effekts in Sekunden.
-    # Egal wie viele Frames tte produziert oder wie langsam der Canvas
-    # rendert - nach dieser Zeit wird der Effekt abgebrochen.
-    EFFECT_MAX_SECONDS: ClassVar[float] = 2.0
     # ListItem-ID des virtuellen "Favorites"-Eintrags in der Theme-Liste.
     FAVORITES_ITEM_ID: ClassVar[str] = "fav-theme"
     # ListItem-ID des virtuellen "Custom Seed"-Eintrags in der Theme-Liste.
@@ -377,11 +335,6 @@ class CodenameApp(App[None]):
         self.suggestion_count = self._coerce_count(settings.get("suggestion_count"))
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._custom_seed = str(settings.get("custom_seed", "")).strip()
-        self._effect_name = self._coerce_effect(settings.get("effect"))
-        # Laufende Effekt-Animation - None wenn kein Effekt aktiv ist.
-        self._effect_iter: object | None = None
-        self._effect_timer: Timer | None = None
-        self._effect_started_at: float = 0.0
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
     @staticmethod
@@ -414,13 +367,6 @@ class CodenameApp(App[None]):
         except (TypeError, ValueError):
             return CodenameApp.SUGGESTION_COUNT_DEFAULT
         return max(10, min(40, value - (value % 10)))
-
-    @staticmethod
-    def _coerce_effect(raw: object) -> str:
-        """Normalisiert den Effekt-Key auf einen bekannten Slug oder 'none'."""
-        if not isinstance(raw, str):
-            return EFFECT_NONE
-        return raw if is_valid_effect(raw) else EFFECT_NONE
 
     @staticmethod
     def _deserialize_favorites(raw: object) -> list[Suggestion]:
@@ -465,7 +411,6 @@ class CodenameApp(App[None]):
                 "suggestion_count": self.suggestion_count,
                 "favorites": self._serialize_favorites(),
                 "custom_seed": self._custom_seed,
-                "effect": self._effect_name,
             }
         )
 
@@ -529,13 +474,6 @@ class CodenameApp(App[None]):
                         id="count-slider",
                         classes="settings-slider",
                     )
-                    yield Static("Effect", id="effect-label", classes="settings-label")
-                    yield Select(
-                        [(label, key) for key, label in EFFECTS],
-                        value=self._effect_name,
-                        allow_blank=False,
-                        id="effect-select",
-                    )
             yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
             with Vertical(id="right-pane"):
                 yield Static(id="info")
@@ -546,9 +484,6 @@ class CodenameApp(App[None]):
                 )
                 table.add_columns("#", "Name", "Slug", "Pattern", "*")
                 yield table
-                # Effekt-Anzeige: deckt die DataTable waehrend einer Animation
-                # ab. Default unsichtbar - wird in _start_effect aktiviert.
-                yield Static("", id="effect-display", classes="hidden")
                 yield HorizontalSplitter(target_id="suggestions", min_size=6)
                 yield RichLog(id="log", wrap=False, highlight=True, markup=True)
         yield Footer()
@@ -788,9 +723,6 @@ class CodenameApp(App[None]):
         self._switch_theme(event.item.id or "", allow_dialog=False)
 
     def _switch_theme(self, item_id: str, *, allow_dialog: bool = True) -> None:
-        # Laufenden Effekt abbrechen - sonst flackert die Animation weiter,
-        # waehrend bereits ein anderes Theme angezeigt werden soll.
-        self._stop_effect()
         # Virtueller "Favorites"-Eintrag - rechts die Favoriten anzeigen.
         if item_id == self.FAVORITES_ITEM_ID:
             if not self._favorites_mode:
@@ -866,129 +798,7 @@ class CodenameApp(App[None]):
             return
         self._fresh_recipes()
         self._log_event("regenerated")
-        # Effekt zuerst spielen (vor _rerender), damit die animierten Namen
-        # genau den Namen entsprechen, die anschliessend in der Tabelle stehen.
-        self._play_regenerate_effect()
         self._rerender()
-
-    def _play_regenerate_effect(self) -> None:
-        """Spielt den ausgewaehlten tte-Effekt inline in der TUI.
-
-        Versteckt die DataTable, blendet einen Static-Overlay ein und animiert
-        die Frames per Timer. Die Canvas-Groesse wird an den verfuegbaren
-        Pane-Platz gekoppelt, damit bewegungsbasierte Effekte (Matrix, Beams,
-        Rain) die volle Breite nutzen statt nur in der schmalen Text-Spalte
-        zu stattfinden. Per Tick werden EFFECT_FRAME_SKIP Frames konsumiert
-        und nur der letzte gerendert - das beschleunigt die Animation um den
-        Faktor EFFECT_FRAME_SKIP, ohne die Tick-Frequenz hochzuziehen.
-        """
-        if self._effect_name == EFFECT_NONE:
-            return
-        names = self._compute_current_names()
-        if not names:
-            return
-        # Laufenden Effekt abbrechen, bevor wir einen neuen starten.
-        self._stop_effect()
-        # Canvas-Groesse aus der noch sichtbaren Tabelle ableiten - sie hat
-        # exakt die Dimensionen, die das #effect-display gleich annehmen wird.
-        # Begrenzen: tte's Beams skaliert mit dem Canvas und wird sonst zu lang.
-        table = self.query_one("#suggestions", DataTable)
-        canvas_width = max(40, min(120, table.size.width - 2))
-        canvas_height = max(10, min(30, table.size.height - 1))
-        try:
-            text = "\n".join(names)
-            self._effect_iter = iter_effect_frames(
-                text,
-                self._effect_name,
-                canvas_width=canvas_width,
-                canvas_height=canvas_height,
-            )
-        except Exception as exc:
-            self._log_event(f"[red]effect init failed: {exc}[/red]")
-            return
-        table.add_class("hidden")
-        display = self.query_one("#effect-display", Static)
-        display.remove_class("hidden")
-        display.update("")
-        self._effect_started_at = time.monotonic()
-        self._effect_timer = self.set_interval(1 / 60, self._tick_effect)
-        # Footer neu rendern, damit das Esc-Binding sofort erscheint.
-        self.refresh_bindings()
-
-    def _tick_effect(self) -> None:
-        """Konsumiert FRAME_SKIP Frames und rendert den letzten ins Static.
-
-        Frame-Skipping ist der Speed-Multiplikator: tte produziert seine
-        Animation in 1x-Geschwindigkeit, wir verwerfen die Zwischenframes.
-        Das harte Zeit-Cap (EFFECT_MAX_SECONDS) verhindert, dass langlaufende
-        Effekte oder ein langsamer Render-Pfad die Animation in die Laenge
-        ziehen.
-        """
-        if self._effect_iter is None:
-            self._stop_effect()
-            return
-        if time.monotonic() - self._effect_started_at > self.EFFECT_MAX_SECONDS:
-            self._stop_effect()
-            return
-        last_frame: str | None = None
-        exhausted = False
-        for _ in range(self.EFFECT_FRAME_SKIP):
-            try:
-                last_frame = next(self._effect_iter)  # type: ignore[call-overload]
-            except StopIteration:
-                exhausted = True
-                break
-            except Exception as exc:
-                self._log_event(f"[red]effect failed: {exc}[/red]")
-                self._stop_effect()
-                return
-        if last_frame is not None:
-            try:
-                display = self.query_one("#effect-display", Static)
-                display.update(Text.from_ansi(last_frame))
-            except Exception:
-                # Widget evtl. nicht mehr da (z.B. waehrend Layout-Wechsel) -
-                # Effekt sauber beenden.
-                self._stop_effect()
-                return
-        if exhausted:
-            self._stop_effect()
-
-    def _stop_effect(self) -> None:
-        """Beendet eine laufende Effekt-Animation und stellt die Tabelle wieder her."""
-        was_running = self._effect_timer is not None
-        if self._effect_timer is not None:
-            self._effect_timer.stop()
-            self._effect_timer = None
-        self._effect_iter = None
-        try:
-            self.query_one("#effect-display", Static).add_class("hidden")
-            self.query_one("#suggestions", DataTable).remove_class("hidden")
-        except Exception:
-            pass
-        if was_running:
-            # Esc-Binding aus dem Footer wieder entfernen.
-            self.refresh_bindings()
-
-    def _compute_current_names(self) -> list[str]:
-        """Berechnet die Namen, die ein anschliessendes _rerender erzeugen wuerde.
-
-        Wir koennen nicht einfach die Tabelle abfragen - sie zeigt noch die
-        VORHERIGE Generation. Stattdessen rendern wir die aktuellen Recipes
-        einmal in Memory, ohne die Suggestion-Liste oder die Tabelle anzufassen.
-        """
-        if self._seed_mode and self._custom_seed:
-            theme = self.generator.seeded_theme(self._custom_seed)
-            recipes = self._recipes.get(CUSTOM_SEED_SLUG, [])
-        elif self.theme_slug:
-            theme = self.generator.themes[self.theme_slug]
-            recipes = self._recipes.get(self.theme_slug, [])
-        else:
-            return []
-        mutation = self.mutation_percent / 100.0
-        return [
-            self.generator.render(r, theme, self.word_count, mutation).name for r in recipes
-        ]
 
     def action_edit_seed(self) -> None:
         """Oeffnet den Eingabedialog fuer den Custom Seed."""
@@ -1074,17 +884,6 @@ class CodenameApp(App[None]):
         self._log_event(f"mutation -> [b]{new_value}%[/b]")
         self._save_settings()
         self._rerender()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        """Verarbeitet die Auswahl im Effekt-Dropdown."""
-        if event.select.id != "effect-select":
-            return
-        new_value = str(event.value) if event.value is not None else EFFECT_NONE
-        if not is_valid_effect(new_value) or new_value == self._effect_name:
-            return
-        self._effect_name = new_value
-        self._log_event(f"effect -> [b]{new_value}[/b]")
-        self._save_settings()
 
     def on_slider_changed(self, event: Slider.Changed) -> None:
         new_value = int(event.value)
@@ -1224,17 +1023,7 @@ class CodenameApp(App[None]):
         if action == "add_custom_favorite" and not self._favorites_mode:
             # "+" gibt es nur in der Favoriten-Ansicht.
             return None
-        if action == "stop_effect" and self._effect_timer is None:
-            # Esc gibt es nur waehrend ein Effekt laeuft.
-            return None
         return True
-
-    def action_stop_effect(self) -> None:
-        """User-Abbruch eines laufenden tte-Effekts (Esc)."""
-        if self._effect_timer is None:
-            return
-        self._log_event("effect [b]aborted[/b]")
-        self._stop_effect()
 
     def on_suggestions_table_right_clicked(
         self, event: SuggestionsTable.RightClicked
