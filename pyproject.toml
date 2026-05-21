@@ -34,7 +34,6 @@ dependencies = [
     "textual-widgets",
     "textual-themes",
     "textual-slider>=0.1.0",
-    "terminaltexteffects>=0.15.0",
 ]
 
 [project.urls]
