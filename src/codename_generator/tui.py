@@ -12,6 +12,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Click
 from textual.message import Message
 from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widgets import (
     DataTable,
     Footer,
@@ -33,7 +34,12 @@ from textual_widgets import (
 )
 
 from codename_generator import __author__, __version__, __year__
-from codename_generator.effects import EFFECT_NONE, EFFECTS, is_valid_effect, play_effect
+from codename_generator.effects import (
+    EFFECT_NONE,
+    EFFECTS,
+    is_valid_effect,
+    iter_effect_frames,
+)
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
     RANDOM_THEME_SLUG,
@@ -293,6 +299,18 @@ class CodenameApp(App[None]):
     #suggestions {
         height: 1fr;
     }
+    #effect-display {
+        height: 1fr;
+        background: $surface;
+        padding: 0 1;
+        overflow: hidden;
+    }
+    #effect-display.hidden {
+        display: none;
+    }
+    #suggestions.hidden {
+        display: none;
+    }
     #log {
         height: 6;
         background: $boost;
@@ -350,6 +368,9 @@ class CodenameApp(App[None]):
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._custom_seed = str(settings.get("custom_seed", "")).strip()
         self._effect_name = self._coerce_effect(settings.get("effect"))
+        # Laufende Effekt-Animation - None wenn kein Effekt aktiv ist.
+        self._effect_iter: object | None = None
+        self._effect_timer: Timer | None = None
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
     @staticmethod
@@ -514,6 +535,9 @@ class CodenameApp(App[None]):
                 )
                 table.add_columns("#", "Name", "Slug", "Pattern", "*")
                 yield table
+                # Effekt-Anzeige: deckt die DataTable waehrend einer Animation
+                # ab. Default unsichtbar - wird in _start_effect aktiviert.
+                yield Static("", id="effect-display", classes="hidden")
                 yield HorizontalSplitter(target_id="suggestions", min_size=6)
                 yield RichLog(id="log", wrap=False, highlight=True, markup=True)
         yield Footer()
@@ -753,6 +777,9 @@ class CodenameApp(App[None]):
         self._switch_theme(event.item.id or "", allow_dialog=False)
 
     def _switch_theme(self, item_id: str, *, allow_dialog: bool = True) -> None:
+        # Laufenden Effekt abbrechen - sonst flackert die Animation weiter,
+        # waehrend bereits ein anderes Theme angezeigt werden soll.
+        self._stop_effect()
         # Virtueller "Favorites"-Eintrag - rechts die Favoriten anzeigen.
         if item_id == self.FAVORITES_ITEM_ID:
             if not self._favorites_mode:
@@ -834,25 +861,66 @@ class CodenameApp(App[None]):
         self._rerender()
 
     def _play_regenerate_effect(self) -> None:
-        """Spielt den ausgewaehlten tte-Effekt auf den frisch generierten Namen.
+        """Spielt den ausgewaehlten tte-Effekt inline in der TUI.
 
-        Berechnet die neuen Vorschlaege (ohne Tabellen-Update), reicht ihre
-        Namen an die tte-Animation und gibt das Terminal waehrend des Effekts
-        via `App.suspend()` frei - Textual rendert solange nicht.
+        Versteckt die DataTable, blendet einen Static-Overlay ein und animiert
+        die Frames per Timer (60 fps = tte's Default). tte-Frames sind reine
+        Text-Snapshots ohne Cursor-Positionierung - daher genuegt `Text.from_ansi`
+        pro Frame. Nach dem letzten Frame schaltet die Tabelle wieder ein.
         """
         if self._effect_name == EFFECT_NONE:
             return
         names = self._compute_current_names()
         if not names:
             return
-        text = "\n".join(names)
+        # Laufenden Effekt abbrechen, bevor wir einen neuen starten - sonst
+        # ueberlagern sich zwei Timer.
+        self._stop_effect()
         try:
-            with self.suspend():
-                play_effect(text, self._effect_name)
+            text = "\n".join(names)
+            self._effect_iter = iter_effect_frames(text, self._effect_name)
         except Exception as exc:
-            # Effekte sind reines Eye-Candy - bei Fehlern still weiterlaufen,
-            # aber im Log hinterlassen, damit der User es findet.
+            self._log_event(f"[red]effect init failed: {exc}[/red]")
+            return
+        self.query_one("#suggestions", DataTable).add_class("hidden")
+        display = self.query_one("#effect-display", Static)
+        display.remove_class("hidden")
+        display.update("")
+        self._effect_timer = self.set_interval(1 / 60, self._tick_effect)
+
+    def _tick_effect(self) -> None:
+        """Liest den naechsten Frame und aktualisiert das Static-Widget."""
+        if self._effect_iter is None:
+            self._stop_effect()
+            return
+        try:
+            frame = next(self._effect_iter)  # type: ignore[call-overload]
+        except StopIteration:
+            self._stop_effect()
+            return
+        except Exception as exc:
             self._log_event(f"[red]effect failed: {exc}[/red]")
+            self._stop_effect()
+            return
+        try:
+            display = self.query_one("#effect-display", Static)
+            display.update(Text.from_ansi(frame))
+        except Exception:
+            # Widget evtl. nicht mehr da (z.B. waehrend Layout-Wechsel) -
+            # Effekt sauber beenden.
+            self._stop_effect()
+
+    def _stop_effect(self) -> None:
+        """Beendet eine laufende Effekt-Animation und stellt die Tabelle wieder her."""
+        if self._effect_timer is not None:
+            self._effect_timer.stop()
+            self._effect_timer = None
+        self._effect_iter = None
+        try:
+            self.query_one("#effect-display", Static).add_class("hidden")
+            self.query_one("#suggestions", DataTable).remove_class("hidden")
+        except Exception:
+            pass
 
     def _compute_current_names(self) -> list[str]:
         """Berechnet die Namen, die ein anschliessendes _rerender erzeugen wuerde.
