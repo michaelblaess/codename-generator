@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sys
+import time
 from datetime import datetime
 from typing import ClassVar
 
@@ -345,6 +346,10 @@ class CodenameApp(App[None]):
     # gerendert. Ein Wert von 3 lasst die Animation 3x schneller wirken,
     # ohne die Tick-Frequenz selbst hochzuziehen.
     EFFECT_FRAME_SKIP: ClassVar[int] = 3
+    # Hartes Cap fuer die maximale Spieldauer eines Effekts in Sekunden.
+    # Egal wie viele Frames tte produziert oder wie langsam der Canvas
+    # rendert - nach dieser Zeit wird der Effekt abgebrochen.
+    EFFECT_MAX_SECONDS: ClassVar[float] = 2.0
     # ListItem-ID des virtuellen "Favorites"-Eintrags in der Theme-Liste.
     FAVORITES_ITEM_ID: ClassVar[str] = "fav-theme"
     # ListItem-ID des virtuellen "Custom Seed"-Eintrags in der Theme-Liste.
@@ -376,6 +381,7 @@ class CodenameApp(App[None]):
         # Laufende Effekt-Animation - None wenn kein Effekt aktiv ist.
         self._effect_iter: object | None = None
         self._effect_timer: Timer | None = None
+        self._effect_started_at: float = 0.0
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
 
     @staticmethod
@@ -885,9 +891,10 @@ class CodenameApp(App[None]):
         self._stop_effect()
         # Canvas-Groesse aus der noch sichtbaren Tabelle ableiten - sie hat
         # exakt die Dimensionen, die das #effect-display gleich annehmen wird.
+        # Begrenzen: tte's Beams skaliert mit dem Canvas und wird sonst zu lang.
         table = self.query_one("#suggestions", DataTable)
-        canvas_width = max(40, table.size.width - 2)
-        canvas_height = max(10, table.size.height - 1)
+        canvas_width = max(40, min(120, table.size.width - 2))
+        canvas_height = max(10, min(30, table.size.height - 1))
         try:
             text = "\n".join(names)
             self._effect_iter = iter_effect_frames(
@@ -903,6 +910,7 @@ class CodenameApp(App[None]):
         display = self.query_one("#effect-display", Static)
         display.remove_class("hidden")
         display.update("")
+        self._effect_started_at = time.monotonic()
         self._effect_timer = self.set_interval(1 / 60, self._tick_effect)
         # Footer neu rendern, damit das Esc-Binding sofort erscheint.
         self.refresh_bindings()
@@ -912,8 +920,14 @@ class CodenameApp(App[None]):
 
         Frame-Skipping ist der Speed-Multiplikator: tte produziert seine
         Animation in 1x-Geschwindigkeit, wir verwerfen die Zwischenframes.
+        Das harte Zeit-Cap (EFFECT_MAX_SECONDS) verhindert, dass langlaufende
+        Effekte oder ein langsamer Render-Pfad die Animation in die Laenge
+        ziehen.
         """
         if self._effect_iter is None:
+            self._stop_effect()
+            return
+        if time.monotonic() - self._effect_started_at > self.EFFECT_MAX_SECONDS:
             self._stop_effect()
             return
         last_frame: str | None = None

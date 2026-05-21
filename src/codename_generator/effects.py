@@ -146,6 +146,10 @@ def iter_effect_frames(
             effect.terminal_config.canvas_width = canvas_width
         if canvas_height > 0:
             effect.terminal_config.canvas_height = canvas_height
+        # Text und Canvas zentrieren - so erscheint die Animation in der Mitte
+        # des Panels statt unten-links angeklebt (tte-Default 'sw').
+        effect.terminal_config.anchor_canvas = "c"
+        effect.terminal_config.anchor_text = "c"
         for attr, value in _EFFECT_CONFIG_OVERRIDES.get(slug, {}).items():
             setattr(effect.effect_config, attr, value)
         return iter(effect)
