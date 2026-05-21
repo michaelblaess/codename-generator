@@ -1,24 +1,27 @@
-"""Integration der `terminaltexteffects`-Library als optionaler Render-Effekt.
+"""Integration der `terminaltexteffects`-Library als Render-Effekt fuer Textual.
 
 Public API:
     - `EFFECTS` - geordnete Liste (key, label) der unterstuetzten Effekte
-    - `EFFECTS_BY_KEY` - Dict key -> tte-Effekt-Klasse
-    - `play_effect(text, key)` - spielt den gewaehlten Effekt direkt im Terminal
+    - `EFFECT_NONE` - reserved key fuer "kein Effekt"
+    - `is_valid_effect(key)` - True wenn key ein bekannter Slug ist
+    - `iter_effect_frames(text, key)` - liefert die Frame-Iteration eines tte-Effekts
 
-`terminaltexteffects` schreibt rohe ANSI-Sequenzen (inkl. Cursor-Positionierung)
-direkt nach stdout. Das vertraegt sich nicht mit Textuals Compositor; der
-Aufrufer muss `App.suspend()` als Kontextmanager um `play_effect()` legen,
-damit Textual fuer die Dauer der Animation aus dem Terminal raus ist.
+Eigenheit von tte-Frames:
+    Jeder Frame ist ein VOLLSTAENDIGER Text-Snapshot - reine ANSI-Farb-/Style-
+    Codes plus die sichtbaren Zeichen, getrennt durch `\\n`. KEINE Cursor-
+    Positionierungs-Sequenzen. Damit laesst sich jeder Frame direkt in ein
+    Textual-Static-Widget rendern (z.B. via `Text.from_ansi`), ohne dass ein
+    Mini-Terminal-Emulator gebraucht wird oder Textual suspended werden muss.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from importlib import import_module
 from typing import Any
 
 # Schluessel "none" ist reserviert fuer "kein Effekt" - der App-Code prueft das
-# explizit, bevor sie play_effect aufruft.
+# explizit, bevor sie einen Effekt startet.
 EFFECT_NONE = "none"
 
 # (key, label, modul, klasse)
@@ -87,30 +90,29 @@ def is_valid_effect(key: str) -> bool:
     return key in _VALID_KEYS
 
 
-def play_effect(text: str, key: str) -> None:
-    """Spielt den gewaehlten Effekt auf `text` im aktuellen Terminal.
+def iter_effect_frames(text: str, key: str) -> Iterator[str]:
+    """Liefert die rohe Frame-Iteration eines tte-Effekts fuer Inline-Rendering.
 
     Args:
         text:
             Mehrzeiliger Text, der animiert werden soll. Jede Zeile ist
             eine eigene Vorschlags-Reihe.
         key:
-            Effekt-Slug aus `EFFECTS`. `EFFECT_NONE` ist ein No-op.
+            Effekt-Slug aus `EFFECTS`. `EFFECT_NONE` liefert einen leeren
+            Iterator (kein Frame).
 
-    Wichtig:
-        Der Aufrufer muss `App.suspend()` aussenrum legen, damit Textual
-        das Terminal freigibt. Ohne Suspend kollidiert tte mit Textuals
-        Compositor und rendert kaputt.
+    Returns:
+        Iterator ueber Frame-Strings. Jeder Frame ist ein vollstaendiger
+        Text-Snapshot mit ANSI-Farb-/Style-Codes und `\\n` als Zeilentrenner -
+        kompatibel mit `rich.text.Text.from_ansi(...)`.
+
+    Bei unbekanntem `key` wird ein leerer Iterator zurueckgegeben.
     """
     if key == EFFECT_NONE:
-        return
+        return iter(())
     for slug, _label, module_stem, class_name in _EFFECT_DEFS:
         if slug != key:
             continue
         effect_cls = _load_effect_class(module_stem, class_name)
-        effect = effect_cls(text)
-        with effect.terminal_output() as terminal:
-            for frame in effect:
-                terminal.print(frame)
-        return
-    # Unbekannter Key - still ignorieren statt zu crashen.
+        return iter(effect_cls(text))
+    return iter(())
