@@ -10,3 +10,6 @@ build/
 *.log
 .coverage
 htmlcov/
+
+# Interne Planungsnotizen - gehoeren nicht ins oeffentliche Repo
+PLAN*.md
