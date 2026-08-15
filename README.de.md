@@ -15,13 +15,15 @@
 [![CI](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Themes](https://img.shields.io/badge/themes-20-yellow)](src/codename_generator/data/themes)
+[![Themes](https://img.shields.io/badge/themes-23-yellow)](src/codename_generator/data/themes)
 
 Ein Codename-Generator für das Terminal. Wähle ein Thema (griechische Götter, Rennpferde, Edelsteine, Whisky, ...) und erhalte einen Stapel einzigartiger Vorschläge (10 bis 40, frei wählbar), kombiniert mit Adjektiv- oder Verb-Modifikatoren und optionalen phonetischen Mutationen.
 
 ## Themen
 
 Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Gefährliche Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Swatch-Uhren · Dev · Random (gepoolt)
+
+Deutsche Themen (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
 Zwei Themen nutzen ihre eigenen kuratierten Wort-Pools:
 
@@ -53,7 +55,7 @@ run.bat          # Windows
 uv run codename  # jede Plattform
 ```
 
-Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `a` Info · `q` beenden
+Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `l` Sprachfilter · `a` Info · `q` beenden
 
 Das linke Einstellungspanel hat drei Schieberegler: **Mutationswahrscheinlichkeit**
 (0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Wörter pro Name) und
@@ -80,6 +82,8 @@ uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 uv run codename -t random -n 20         # pulls from every theme
 uv run codename -t whisky --words 3     # exactly 3 components per name
+uv run codename --list-themes --lang de  # nur die deutschen Themen
+uv run codename -t tierwelt -n 10       # deutsche Namen, korrekt gebeugt
 ```
 
 Ein `*` neben einem Vorschlag bedeutet, dass eine phonetische Mutation angewendet wurde
@@ -96,6 +100,44 @@ words:
   - Word1
   - Word2
 ```
+
+## Sprachen
+
+Ein Thema gibt seine Sprache an, und die Sprache entscheidet, aus welchen
+Modifikator-Pools es zieht, wie der Name zusammengesetzt wird und ob der
+Modifikator gebeugt wird. Themen ohne `language`-Schlüssel sind englisch.
+
+```yaml
+name: Tierwelt
+description: Heimische Tiere
+language: de
+words:
+  - Falke|m
+  - Eule|f
+  - Wiesel|n
+```
+
+Der Marker `|m` / `|f` / `|n` / `|p` ist das Genus des Substantivs. Deutsch
+beugt den vorangestellten Modifikator danach - aus `still` wird
+`Stiller Falke`, `Stille Eule`, `Stilles Wiesel`. Ohne Marker gilt das
+Maskulinum. Sprachen ohne Flexion (Englisch) ignorieren ihn.
+
+Die Modifikator-Pools liegen je Sprache in
+`src/codename_generator/data/modifiers/<lang>/` - `adjectives.yaml`,
+`verbs.yaml` und `agents.yaml`. Eine Sprache ohne eigenen Ordner fällt auf die
+englischen Pools zurück. Die deutschen Verben sind Partizipien I (`jagend`,
+`lauernd`), weil das Deutsche genau die vor das Substantiv stellt.
+
+Auch die Wortstellung unterscheidet sich: Deutsch stellt kein Partizip nach,
+deshalb entfällt `theme-verb` ("Falke Jagend") und dreiteilige Namen nutzen
+`adj-verb-theme` ("Stiller Jagender Falke") statt `adj-theme-verb`.
+
+Jede Sprache bekommt ihr eigenes **Random**-Thema (`random`, `random-de`, ...),
+damit ein gepoolter Zug nie ein deutsches Substantiv mit einem englischen
+Adjektiv kombiniert. In der TUI schaltet `l` den Sprachfilter der Themenliste
+weiter, `--lang` tut dasselbe für `--list-themes`. Slugs bleiben ASCII:
+Umlaute werden ausgeschrieben (`Grüner Blitz -> gruener-blitz`), Akzente
+fallen weg (`Volupté -> volupte`).
 
 ## Danksagung
 

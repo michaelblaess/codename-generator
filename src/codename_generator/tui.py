@@ -33,6 +33,7 @@ from codename_generator.generator import (
     Suggestion,
 )
 from codename_generator.settings import JsonSettingsStore
+from codename_generator.wordlist import DEFAULT_LANGUAGE
 
 _DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
 
@@ -68,9 +69,7 @@ class SuggestionsTable(DataTable[str]):
             row = event.style.meta.get("row")
             if isinstance(row, int) and row >= 0:
                 self.move_cursor(row=row)
-                self.post_message(
-                    self.RightClicked(row, event.screen_x, event.screen_y)
-                )
+                self.post_message(self.RightClicked(row, event.screen_x, event.screen_y))
             event.stop()
             return
         await super()._on_click(event)
@@ -177,9 +176,12 @@ class AboutScreen(ModalScreen[None]):
         text.append("Themes  ", style="dim")
         text.append(
             "Greek/Egyptian/Norse Gods · Constellations · "
-            "Animals · Racehorses · Flowers · Gemstones · Wines · Whisky · "
-            "Mountains · Mushrooms · Ships · Landmarks · Random\n\n"
+            "Animals · Dangerous animals · Racehorses · Flowers · Gemstones · "
+            "Wines · Whisky · Mountains · Mushrooms · Ships · Landmarks · "
+            "Swatch · Random\n        "
         )
+        text.append("Deutsch ", style="dim")
+        text.append("Tierwelt · Sagenwesen · Wetter und Landschaft\n\n")
 
         text.append("Keys    ", style="dim")
         text.append("r ", style="bold")
@@ -200,6 +202,8 @@ class AboutScreen(ModalScreen[None]):
         text.append("idea seed  ")
         text.append("+ ", style="bold")
         text.append("add idea\n        ")
+        text.append("l ", style="bold")
+        text.append("language filter  ")
         text.append("a ", style="bold")
         text.append("about  ")
         text.append("q ", style="bold")
@@ -298,6 +302,7 @@ class CodenameApp(App[None]):
         Binding("f,F", "toggle_favorite", "Fav", key_display="f"),
         Binding("v,V", "open_favorites", "View favs", key_display="v"),
         Binding("i,I", "edit_seed", "Idea seed", key_display="i"),
+        Binding("l,L", "cycle_language", "Language", key_display="l"),
         Binding("plus", "add_custom_favorite", "Add idea", key_display="+"),
         Binding("a,A", "about", "About", key_display="a"),
         Binding("q,Q", "quit", "Quit", key_display="q"),
@@ -320,6 +325,8 @@ class CodenameApp(App[None]):
 
         self.generator = Generator.load()
         self.theme_slugs = list(self.generator.themes.keys())
+        # Sprachen, zwischen denen "l" umschaltet - "" heisst "alle zeigen".
+        self.languages = sorted({t.language for t in self.generator.themes.values()})
         self.theme_slug = self.theme_slugs[0] if self.theme_slugs else ""
         self.suggestions: list[Suggestion] = []
         # Recipes pro Theme - bleiben erhalten bis "r" neue erzeugt.
@@ -336,6 +343,32 @@ class CodenameApp(App[None]):
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._custom_seed = str(settings.get("custom_seed", "")).strip()
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
+        self._language_filter = self._coerce_language(settings.get("language_filter"))
+        # Sprache, mit der die Custom-Seed-Recipes erzeugt wurden - die Modifier
+        # im Cache duerfen nicht nachtraeglich die Sprache wechseln.
+        self._seed_language = DEFAULT_LANGUAGE
+        if self._language_filter:
+            self.theme_slug = self._visible_theme_slugs()[0] if self._visible_theme_slugs() else ""
+
+    def _coerce_language(self, raw: object) -> str:
+        """Uebernimmt einen gespeicherten Sprachfilter nur wenn es die Sprache gibt."""
+        value = str(raw or "")
+        return value if value in self.languages else ""
+
+    def _visible_theme_slugs(self) -> list[str]:
+        """Theme-Slugs, die der aktive Sprachfilter durchlaesst."""
+        if not self._language_filter:
+            return self.theme_slugs
+        return [
+            slug
+            for slug in self.theme_slugs
+            if self.generator.themes[slug].language == self._language_filter
+        ]
+
+    def _current_language(self) -> str:
+        """Sprache des aktuell gewaehlten Themes."""
+        theme = self.generator.themes.get(self.theme_slug)
+        return theme.language if theme else DEFAULT_LANGUAGE
 
     @staticmethod
     def _coerce_mutation(raw: object) -> int:
@@ -411,6 +444,7 @@ class CodenameApp(App[None]):
                 "suggestion_count": self.suggestion_count,
                 "favorites": self._serialize_favorites(),
                 "custom_seed": self._custom_seed,
+                "language_filter": self._language_filter,
             }
         )
 
@@ -430,19 +464,28 @@ class CodenameApp(App[None]):
         seed_item = ListItem(Static(seed_label), id=self.CUSTOM_SEED_ITEM_ID)
         seed_item.tooltip = "Combine your own word with adjectives and verbs"
         items: list[ListItem] = [fav_item, seed_item]
-        for slug in self.theme_slugs:
+        # Das Sprachkuerzel ist nur dann Information, wenn es mehr als eine gibt.
+        show_language = len(self.languages) > 1
+        for slug in self._visible_theme_slugs():
             theme = self.generator.themes[slug]
-            item = ListItem(Static(theme.name), id=f"theme-{slug}")
+            label = f"{theme.name}  [dim]{theme.language}[/dim]" if show_language else theme.name
+            item = ListItem(Static(label), id=f"theme-{slug}")
             if theme.description:
                 item.tooltip = theme.description
             items.append(item)
         return items
 
+    def _themes_title(self) -> str:
+        """Titel der Theme-Spalte - zeigt den aktiven Sprachfilter mit an."""
+        if not self._language_filter:
+            return "[b]Themes[/b]"
+        return f"[b]Themes[/b] [dim]{self._language_filter}[/dim]"
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Horizontal(id="main"):
             with Vertical(id="themes-pane"):
-                yield Static("[b]Themes[/b]")
+                yield Static(self._themes_title(), id="themes-title")
                 yield ListView(*self._theme_items(), id="theme-list")
                 yield HorizontalSplitter(target_id="theme-list", min_size=6)
                 with Vertical(id="settings-pane"):
@@ -539,9 +582,7 @@ class CodenameApp(App[None]):
             else f"Mutation: [b]{self.mutation_percent}%[/b]"
         )
         wc_label.update(
-            "Words: [b]locked by theme[/b]"
-            if words_locked
-            else f"Words: [b]{self.word_count}[/b]"
+            "Words: [b]locked by theme[/b]" if words_locked else f"Words: [b]{self.word_count}[/b]"
         )
 
         # Die Vorschlagsanzahl gilt fuer jedes Theme - nie durch das Theme gesperrt.
@@ -558,7 +599,7 @@ class CodenameApp(App[None]):
         wie bei einem normalen Theme. Theme-spezifische Sperren entfallen.
         """
         self.query_one("#info", Static).update(
-            f"[b]Custom Seed[/b]  [dim]your idea \"{self._custom_seed}\" combined with "
+            f'[b]Custom Seed[/b]  [dim]your idea "{self._custom_seed}" combined with '
             "adjectives and verbs - press [b]i[/b] to change[/dim]"
         )
         mut_label = self.query_one("#mutation-label", Static)
@@ -607,15 +648,17 @@ class CodenameApp(App[None]):
     def _ensure_seed_recipes(self) -> None:
         """Erzeugt Recipes fuer den aktuellen Custom-Seed, falls noch keine im Cache."""
         if self._custom_seed and CUSTOM_SEED_SLUG not in self._recipes:
+            self._seed_language = self._current_language()
             self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
-                self._custom_seed, count=self.suggestion_count
+                self._custom_seed, count=self.suggestion_count, language=self._seed_language
             )
 
     def _fresh_recipes(self) -> None:
         """Verwirft die Recipes des aktuellen Themes/Seeds und erzeugt neue."""
         if self._seed_mode and self._custom_seed:
+            self._seed_language = self._current_language()
             self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
-                self._custom_seed, count=self.suggestion_count
+                self._custom_seed, count=self.suggestion_count, language=self._seed_language
             )
             return
         if self.theme_slug:
@@ -659,7 +702,7 @@ class CodenameApp(App[None]):
         """Rendert die Custom-Seed-Recipes mit aktueller Mutation/Wortzahl."""
         if not self._custom_seed:
             return
-        theme = self.generator.seeded_theme(self._custom_seed)
+        theme = self.generator.seeded_theme(self._custom_seed, self._seed_language)
         mutation = self.mutation_percent / 100.0
         recipes = self._recipes.get(CUSTOM_SEED_SLUG, [])
         self.suggestions = [
@@ -683,9 +726,7 @@ class CodenameApp(App[None]):
     def _render_favorites(self) -> None:
         """Zeigt die gespeicherten Favoriten rechts an - mit aktueller Mutation."""
         mutation = self.mutation_percent / 100.0
-        self.suggestions = [
-            self.generator.render_favorite(fav, mutation) for fav in self.favorites
-        ]
+        self.suggestions = [self.generator.render_favorite(fav, mutation) for fav in self.favorites]
         table = self.query_one("#suggestions", DataTable)
         table.clear()
         if not self.suggestions:
@@ -809,7 +850,7 @@ class CodenameApp(App[None]):
         self.push_screen(
             TextInputScreen(
                 title="Custom Seed",
-                prompt="Your idea (e.g. \"Sitemap\" or \"Link\"):",
+                prompt='Your idea (e.g. "Sitemap" or "Link"):',
                 initial=self._custom_seed,
                 placeholder="Sitemap",
                 validator=lambda s: None if s.strip() else "Please enter a word.",
@@ -912,6 +953,32 @@ class CodenameApp(App[None]):
             self._ensure_seed_recipes()
         else:
             return
+        self._save_settings()
+        self._rerender()
+
+    async def action_cycle_language(self) -> None:
+        """Schaltet den Sprachfilter der Theme-Liste weiter (alle -> en -> de -> ...)."""
+        if len(self.languages) < 2:
+            return
+        options = ["", *self.languages]
+        self._language_filter = options[(options.index(self._language_filter) + 1) % len(options)]
+        visible = self._visible_theme_slugs()
+        if not visible:
+            return
+        self.query_one("#themes-title", Static).update(self._themes_title())
+        list_view = self.query_one("#theme-list", ListView)
+        await list_view.clear()
+        await list_view.extend(self._theme_items())
+        # Faellt das aktive Theme aus dem Filter, uebernimmt das erste sichtbare.
+        if self.theme_slug not in visible:
+            self.theme_slug = visible[0]
+            self.sub_title = self.theme_slug
+            self._favorites_mode = False
+            self._seed_mode = False
+            self._apply_theme_default_mutation()
+            self._ensure_recipes()
+        list_view.index = 2 + visible.index(self.theme_slug)
+        self._log_event(f"language -> [b]{self._language_filter or 'all'}[/b]")
         self._save_settings()
         self._rerender()
 
@@ -1025,18 +1092,14 @@ class CodenameApp(App[None]):
             return None
         return True
 
-    def on_suggestions_table_right_clicked(
-        self, event: SuggestionsTable.RightClicked
-    ) -> None:
+    def on_suggestions_table_right_clicked(self, event: SuggestionsTable.RightClicked) -> None:
         """Oeffnet das Kontextmenue fuer die rechtsgeklickte Vorschlagszeile."""
         if len(self.screen_stack) > 1:
             return
         if not 0 <= event.row < len(self.suggestions):
             return
         suggestion = self.suggestions[event.row]
-        is_fav = self._favorites_mode or any(
-            f.slug == suggestion.slug for f in self.favorites
-        )
+        is_fav = self._favorites_mode or any(f.slug == suggestion.slug for f in self.favorites)
         items = [
             ContextMenuItem("copy_slug", "Copy slug", shortcut="c"),
             ContextMenuItem("copy_name", "Copy name", shortcut="n"),
@@ -1051,9 +1114,7 @@ class CodenameApp(App[None]):
         if self._favorites_mode:
             # In der Favoriten-Ansicht: manuellen Idea-Eintrag hinzufuegen.
             items.append(ContextMenuItem.separator())
-            items.append(
-                ContextMenuItem("add_custom_favorite", "Add custom idea...", shortcut="+")
-            )
+            items.append(ContextMenuItem("add_custom_favorite", "Add custom idea...", shortcut="+"))
         else:
             # "Regenerate" gibt es nur fuer echte Themes/Custom-Seed.
             items.append(ContextMenuItem.separator())
