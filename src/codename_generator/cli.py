@@ -5,6 +5,18 @@ import sys
 
 from codename_generator.generator import Generator
 
+# Mutationswahrscheinlichkeit, wenn weder Aufruf noch Theme etwas vorgeben.
+DEFAULT_MUTATION_CHANCE = 0.35
+
+
+def _mutation_chance(theme_default: int | None, requested: float | None) -> float:
+    """Bestimmt die Mutationswahrscheinlichkeit: Aufruf vor Theme vor Default."""
+    if requested is not None:
+        return requested
+    if theme_default is not None:
+        return theme_default / 100.0
+    return DEFAULT_MUTATION_CHANCE
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -21,8 +33,11 @@ def main() -> int:
     parser.add_argument(
         "--mutation-chance",
         type=float,
-        default=0.35,
-        help="0..1 probability a suggestion uses phonetic mutation",
+        default=None,
+        help=(
+            "0..1 probability a suggestion uses phonetic mutation "
+            f"(default: the theme's own value, else {DEFAULT_MUTATION_CHANCE})"
+        ),
     )
     parser.add_argument(
         "--words",
@@ -32,6 +47,12 @@ def main() -> int:
         help="Exact number of name components (1-3)",
     )
     parser.add_argument("--list-themes", action="store_true")
+    parser.add_argument(
+        "--lang",
+        "-L",
+        default=None,
+        help="Only list themes of this language (e.g. en, de)",
+    )
     args = parser.parse_args()
 
     if args.list_themes or args.theme is None:
@@ -42,15 +63,20 @@ def main() -> int:
             return 0
         gen = Generator.load(seed=args.seed)
         for slug, theme in gen.themes.items():
-            print(f"{slug:24s}  {theme.name} ({len(theme.words)} words)")
+            if args.lang and theme.language != args.lang:
+                continue
+            print(f"{slug:24s}  [{theme.language}]  {theme.name} ({len(theme.words)} words)")
         return 0
 
     gen = Generator.load(seed=args.seed)
+    selected = gen.themes.get(args.theme)
     try:
         suggestions = gen.suggest(
             theme_slug=args.theme,
             count=args.count,
-            mutation_chance=args.mutation_chance,
+            mutation_chance=_mutation_chance(
+                selected.default_mutation if selected else None, args.mutation_chance
+            ),
             word_count=args.words,
         )
     except KeyError as exc:

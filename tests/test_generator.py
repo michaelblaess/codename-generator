@@ -39,8 +39,8 @@ def test_word_count_three_yields_exactly_three_components() -> None:
 def test_load_generator() -> None:
     gen = Generator.load(seed=0)
     assert "greek-gods" in gen.themes
-    assert "adjectives" in gen.modifiers
-    assert "verbs" in gen.modifiers
+    assert "adjectives" in gen.modifiers["en"]
+    assert "verbs" in gen.modifiers["en"]
 
 
 def test_suggest_count() -> None:
@@ -114,9 +114,7 @@ def test_each_theme_word_appears_at_most_once() -> None:
     gen = Generator.load(seed=42)
     suggestions = gen.suggest("racehorses", count=30, mutation_chance=0.6)
     theme_words = [s.source_words[0].lower() for s in suggestions]
-    assert len(theme_words) == len(set(theme_words)), (
-        f"duplicate theme words: {theme_words}"
-    )
+    assert len(theme_words) == len(set(theme_words)), f"duplicate theme words: {theme_words}"
 
 
 def test_source_words_normalized_theme_first() -> None:
@@ -231,8 +229,8 @@ def test_seeded_theme_has_seed_word() -> None:
 def test_agents_modifier_pool_loaded() -> None:
     """data/modifiers/agents.yaml wird als Pool 'agents' geladen."""
     gen = Generator.load(seed=0)
-    assert "agents" in gen.modifiers
-    agents = set(w.lower() for w in gen.modifiers["agents"].words)
+    assert "agents" in gen.modifiers["en"]
+    agents = set(w.lower() for w in gen.modifiers["en"]["agents"].words)
     # Spot-Check: ein paar typische Agent-Nouns muessen drin sein.
     for word in ("runner", "generator", "inspector", "fixer", "crawler"):
         assert word in agents, f"expected '{word}' in agents pool"
@@ -258,7 +256,7 @@ def test_theme_agent_falls_back_to_verb_when_agent_pool_missing() -> None:
     """Ohne agents-Pool fallback auf VERB - kein leerer Wortteil im Namen."""
     gen = Generator.load(seed=3)
     # agents-Pool gezielt entfernen.
-    gen.modifiers.pop("agents", None)
+    gen.modifiers["en"].pop("agents", None)
     seed = "Sitemap"
     theme = gen.seeded_theme(seed)
     recipes = gen.generate_seeded_recipes(seed, count=30)
@@ -271,11 +269,12 @@ def test_theme_agent_falls_back_to_verb_when_agent_pool_missing() -> None:
 
 
 def test_random_theme_exists_and_pools_words() -> None:
+    """Das Random-Theme poolt genau die Woerter SEINER Sprache."""
     gen = Generator.load(seed=0)
     assert "random" in gen.themes
     random_words = set(gen.themes["random"].words)
     other_words: set[str] = set()
     for slug, theme in gen.themes.items():
-        if slug != "random":
+        if not slug.startswith("random") and theme.language == "en":
             other_words.update(theme.words)
     assert random_words == other_words

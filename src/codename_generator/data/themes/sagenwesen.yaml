@@ -1,0 +1,80 @@
+name: Sagenwesen
+description: Gestalten aus deutschen Sagen, Märchen und Volksglauben
+language: de
+default_mutation: 0
+words:
+  # Berg und Erde
+  - Zwerg|m
+  - Wichtel|m
+  - Kobold|m
+  - Bergmännlein|n
+  - Schrat|m
+  - Erdgeist|m
+  - Rübezahl|m
+  - Venedigermännchen|n
+  - Klopfgeist|m
+  - Riese|m
+  # Wasser
+  - Nixe|f
+  - Nöck|m
+  - Wassermann|m
+  - Loreley|f
+  - Undine|f
+  - Meerweib|n
+  - Wasserjungfer|f
+  - Seejungfer|f
+  - Mühlengeist|m
+  # Wald und Feld
+  - Waldschrat|m
+  - Moosweiblein|n
+  - Holzfräulein|n
+  - Geisterjagd|f
+  - Nachtjäger|m
+  - Irrlicht|n
+  - Erlkönig|m
+  - Roggenmuhme|f
+  - Bilwis|m
+  - Waldmann|m
+  # Untiere
+  - Lindwurm|m
+  - Drache|m
+  - Tatzelwurm|m
+  - Basilisk|m
+  - Greif|m
+  - Einhorn|n
+  - Werwolf|m
+  - Höllenhund|m
+  - Aufhocker|m
+  - Nachtmahr|m
+  # Zauber und Fluch
+  - Hexe|f
+  - Alraune|f
+  - Zauberer|m
+  - Wahrsagerin|f
+  - Doppelgänger|m
+  - Wiedergänger|m
+  - Schattenreiter|m
+  - Geisterschimmel|m
+  - Totenglocke|f
+  - Feuermann|m
+  # Sagengestalten
+  - Rattenfänger|m
+  - Freischütz|m
+  - Nibelung|m
+  - Siegfried|m
+  - Brunhild|f
+  - Hagen|m
+  - Barbarossa|m
+  - Störtebeker|m
+  - Faust|m
+  - Till Eulenspiegel|m
+  - Münchhausen|m
+  - Schinderhannes|m
+  - Höllenreiter|m
+  - Frau Holle|f
+  - Sandmann|m
+  - Schneekönigin|f
+  - Rumpelstilzchen|n
+  - Däumling|m
+  - Goldmarie|f
+  - Pechmarie|f

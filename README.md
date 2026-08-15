@@ -15,13 +15,15 @@
 [![CI](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Themes](https://img.shields.io/badge/themes-20-yellow)](src/codename_generator/data/themes)
+[![Themes](https://img.shields.io/badge/themes-23-yellow)](src/codename_generator/data/themes)
 
 A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, whisky, ...), get a batch of unique suggestions (10 to 40, your pick) combined with adjective or verb modifiers and optional phonetic mutations.
 
 ## Themes
 
 Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Swatch watches · Dev · Random (pooled)
+
+German themes (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
 Two themes use their own curated word pools:
 
@@ -53,7 +55,7 @@ run.bat          # Windows
 uv run codename  # any platform
 ```
 
-Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `a` about · `q` quit
+Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `l` language filter · `a` about · `q` quit
 
 The left settings panel has three sliders: **mutation chance** (0-100%),
 **word count** (1, 2 or 3 visible words per name) and **suggestions**
@@ -78,6 +80,8 @@ uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 uv run codename -t random -n 20         # pulls from every theme
 uv run codename -t whisky --words 3     # exactly 3 components per name
+uv run codename --list-themes --lang de  # only the German themes
+uv run codename -t tierwelt -n 10       # German names, inflected
 ```
 
 A `*` next to a suggestion means a phonetic mutation was applied
@@ -94,6 +98,44 @@ words:
   - Word1
   - Word2
 ```
+
+## Languages
+
+A theme declares its language, and that language decides which modifier pools
+it draws from, how the name is put together and whether the modifier gets
+inflected. Themes without a `language` key are English.
+
+```yaml
+name: Tierwelt
+description: Heimische Tiere
+language: de
+words:
+  - Falke|m
+  - Eule|f
+  - Wiesel|n
+```
+
+The `|m` / `|f` / `|n` / `|p` marker is the grammatical gender of the noun.
+German inflects an attributive modifier after it - `still` becomes
+`Stiller Falke`, `Stille Eule`, `Stilles Wiesel`. Without a marker the
+masculine form is used. Languages that do not inflect (English) ignore it.
+
+Modifier pools live per language in
+`src/codename_generator/data/modifiers/<lang>/` - `adjectives.yaml`,
+`verbs.yaml` and `agents.yaml`. A language without its own folder falls back
+to the English pools. German verbs are present participles (`jagend`,
+`lauernd`), because that is what German puts in front of a noun.
+
+Word order differs too: German never trails a participle, so `theme-verb`
+("Falke Jagend") is dropped and three-word names use `adj-verb-theme`
+("Stiller Jagender Falke") instead of `adj-theme-verb`.
+
+Each language gets its own **Random** theme (`random`, `random-de`, ...) so
+pooled draws never mix a German noun with an English adjective. In the TUI,
+`l` cycles the language filter of the theme list, `--lang` does the same for
+`--list-themes`. Slugs stay ASCII: umlauts are written out
+(`Grüner Blitz -> gruener-blitz`), accents are stripped
+(`Volupté -> volupte`).
 
 ## Credits
 
