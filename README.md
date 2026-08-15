@@ -15,13 +15,13 @@
 [![CI](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelblaess/codename-generator/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Themes](https://img.shields.io/badge/themes-18-yellow)](src/codename_generator/data/themes)
+[![Themes](https://img.shields.io/badge/themes-20-yellow)](src/codename_generator/data/themes)
 
 A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, whisky, ...), get a batch of unique suggestions (10 to 40, your pick) combined with adjective or verb modifiers and optional phonetic mutations.
 
 ## Themes
 
-Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Dev · Random (pooled)
+Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Swatch watches · Dev · Random (pooled)
 
 Two themes use their own curated word pools:
 
