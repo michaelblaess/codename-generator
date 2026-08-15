@@ -1,5 +1,6 @@
 name: Mountains
 description: Famous peaks from around the world
+language: neutral
 words:
   - Everest
   - K2

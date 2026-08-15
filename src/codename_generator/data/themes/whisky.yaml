@@ -1,5 +1,6 @@
 name: Whisky
 description: Famous distilleries and single malt regions
+language: neutral
 words:
   - Lagavulin
   - Laphroaig

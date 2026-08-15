@@ -1,5 +1,6 @@
 name: Racehorses
 description: Famous thoroughbred racehorses from history
+language: neutral
 words:
   - Secretariat
   - Frankel

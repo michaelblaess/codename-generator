@@ -12,7 +12,16 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.events import Click
 from textual.message import Message
 from textual.screen import ModalScreen
-from textual.widgets import DataTable, Footer, Header, ListItem, ListView, RichLog, Static
+from textual.widgets import (
+    DataTable,
+    Footer,
+    Header,
+    ListItem,
+    ListView,
+    RichLog,
+    Select,
+    Static,
+)
 from textual_slider import Slider
 from textual_themes import register_all
 from textual_widgets import (
@@ -33,9 +42,12 @@ from codename_generator.generator import (
     Suggestion,
 )
 from codename_generator.settings import JsonSettingsStore
-from codename_generator.wordlist import DEFAULT_LANGUAGE
+from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE
 
 _DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
+
+# Anzeigenamen der Sprachen - Endonyme, damit jeder seine eigene wiedererkennt.
+LANGUAGE_LABELS: dict[str, str] = {"en": "English", "de": "Deutsch"}
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
@@ -181,7 +193,12 @@ class AboutScreen(ModalScreen[None]):
             "Swatch · Random\n        "
         )
         text.append("Deutsch ", style="dim")
-        text.append("Tierwelt · Sagenwesen · Wetter und Landschaft\n\n")
+        text.append("Tierwelt · Sagenwesen · Wetter und Landschaft\n        ")
+        text.append("Language", style="dim")
+        text.append(
+            "  themes of proper names (gods, racehorses, Swatch) follow\n"
+            "        the language picked in the settings panel\n\n"
+        )
 
         text.append("Keys    ", style="dim")
         text.append("r ", style="bold")
@@ -203,7 +220,7 @@ class AboutScreen(ModalScreen[None]):
         text.append("+ ", style="bold")
         text.append("add idea\n        ")
         text.append("l ", style="bold")
-        text.append("language filter  ")
+        text.append("language  ")
         text.append("a ", style="bold")
         text.append("about  ")
         text.append("q ", style="bold")
@@ -325,8 +342,8 @@ class CodenameApp(App[None]):
 
         self.generator = Generator.load()
         self.theme_slugs = list(self.generator.themes.keys())
-        # Sprachen, zwischen denen "l" umschaltet - "" heisst "alle zeigen".
-        self.languages = sorted({t.language for t in self.generator.themes.values()})
+        # Sprachen, in denen generiert werden kann (Default-Sprache zuerst).
+        self.languages = list(self.generator.languages())
         self.theme_slug = self.theme_slugs[0] if self.theme_slugs else ""
         self.suggestions: list[Suggestion] = []
         # Recipes pro Theme - bleiben erhalten bis "r" neue erzeugt.
@@ -343,32 +360,25 @@ class CodenameApp(App[None]):
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._custom_seed = str(settings.get("custom_seed", "")).strip()
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
-        self._language_filter = self._coerce_language(settings.get("language_filter"))
-        # Sprache, mit der die Custom-Seed-Recipes erzeugt wurden - die Modifier
-        # im Cache duerfen nicht nachtraeglich die Sprache wechseln.
-        self._seed_language = DEFAULT_LANGUAGE
-        if self._language_filter:
-            self.theme_slug = self._visible_theme_slugs()[0] if self._visible_theme_slugs() else ""
+        self.content_language = self._coerce_language(settings.get("language"))
+        visible = self._visible_theme_slugs()
+        if self.theme_slug not in visible:
+            self.theme_slug = visible[0] if visible else ""
 
     def _coerce_language(self, raw: object) -> str:
-        """Uebernimmt einen gespeicherten Sprachfilter nur wenn es die Sprache gibt."""
+        """Uebernimmt eine gespeicherte Sprache nur, wenn es sie noch gibt."""
         value = str(raw or "")
-        return value if value in self.languages else ""
+        if value in self.languages:
+            return value
+        return DEFAULT_LANGUAGE if DEFAULT_LANGUAGE in self.languages else self.languages[0]
 
     def _visible_theme_slugs(self) -> list[str]:
-        """Theme-Slugs, die der aktive Sprachfilter durchlaesst."""
-        if not self._language_filter:
-            return self.theme_slugs
+        """Themes der aktiven Sprache plus die neutralen (Eigennamen)."""
         return [
             slug
             for slug in self.theme_slugs
-            if self.generator.themes[slug].language == self._language_filter
+            if self.generator.themes[slug].language in (self.content_language, NEUTRAL_LANGUAGE)
         ]
-
-    def _current_language(self) -> str:
-        """Sprache des aktuell gewaehlten Themes."""
-        theme = self.generator.themes.get(self.theme_slug)
-        return theme.language if theme else DEFAULT_LANGUAGE
 
     @staticmethod
     def _coerce_mutation(raw: object) -> int:
@@ -444,7 +454,7 @@ class CodenameApp(App[None]):
                 "suggestion_count": self.suggestion_count,
                 "favorites": self._serialize_favorites(),
                 "custom_seed": self._custom_seed,
-                "language_filter": self._language_filter,
+                "language": self.content_language,
             }
         )
 
@@ -464,22 +474,18 @@ class CodenameApp(App[None]):
         seed_item = ListItem(Static(seed_label), id=self.CUSTOM_SEED_ITEM_ID)
         seed_item.tooltip = "Combine your own word with adjectives and verbs"
         items: list[ListItem] = [fav_item, seed_item]
-        # Das Sprachkuerzel ist nur dann Information, wenn es mehr als eine gibt.
-        show_language = len(self.languages) > 1
         for slug in self._visible_theme_slugs():
             theme = self.generator.themes[slug]
-            label = f"{theme.name}  [dim]{theme.language}[/dim]" if show_language else theme.name
-            item = ListItem(Static(label), id=f"theme-{slug}")
+            item = ListItem(Static(theme.name), id=f"theme-{slug}")
             if theme.description:
                 item.tooltip = theme.description
             items.append(item)
         return items
 
     def _themes_title(self) -> str:
-        """Titel der Theme-Spalte - zeigt den aktiven Sprachfilter mit an."""
-        if not self._language_filter:
-            return "[b]Themes[/b]"
-        return f"[b]Themes[/b] [dim]{self._language_filter}[/dim]"
+        """Titel der Theme-Spalte - nennt die aktive Sprache."""
+        label = LANGUAGE_LABELS.get(self.content_language, self.content_language)
+        return f"[b]Themes[/b] [dim]{label}[/dim]"
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -516,6 +522,13 @@ class CodenameApp(App[None]):
                         value=self.suggestion_count,
                         id="count-slider",
                         classes="settings-slider",
+                    )
+                    yield Static("Language", classes="settings-label")
+                    yield Select(
+                        [(LANGUAGE_LABELS.get(lang, lang), lang) for lang in self.languages],
+                        value=self.content_language,
+                        allow_blank=False,
+                        id="language-select",
                     )
             yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
             with Vertical(id="right-pane"):
@@ -642,28 +655,26 @@ class CodenameApp(App[None]):
         """Erzeugt Recipes fuer das aktuelle Theme, falls noch keine im Cache."""
         if self.theme_slug and self.theme_slug not in self._recipes:
             self._recipes[self.theme_slug] = self.generator.generate_recipes(
-                self.theme_slug, count=self.suggestion_count
+                self.theme_slug, count=self.suggestion_count, language=self.content_language
             )
 
     def _ensure_seed_recipes(self) -> None:
         """Erzeugt Recipes fuer den aktuellen Custom-Seed, falls noch keine im Cache."""
         if self._custom_seed and CUSTOM_SEED_SLUG not in self._recipes:
-            self._seed_language = self._current_language()
             self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
-                self._custom_seed, count=self.suggestion_count, language=self._seed_language
+                self._custom_seed, count=self.suggestion_count, language=self.content_language
             )
 
     def _fresh_recipes(self) -> None:
         """Verwirft die Recipes des aktuellen Themes/Seeds und erzeugt neue."""
         if self._seed_mode and self._custom_seed:
-            self._seed_language = self._current_language()
             self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
-                self._custom_seed, count=self.suggestion_count, language=self._seed_language
+                self._custom_seed, count=self.suggestion_count, language=self.content_language
             )
             return
         if self.theme_slug:
             self._recipes[self.theme_slug] = self.generator.generate_recipes(
-                self.theme_slug, count=self.suggestion_count
+                self.theme_slug, count=self.suggestion_count, language=self.content_language
             )
 
     def _rerender(self) -> None:
@@ -684,7 +695,8 @@ class CodenameApp(App[None]):
         mutation = self.mutation_percent / 100.0
         recipes = self._recipes.get(self.theme_slug, [])
         self.suggestions = [
-            self.generator.render(r, theme, self.word_count, mutation) for r in recipes
+            self.generator.render(r, theme, self.word_count, mutation, self.content_language)
+            for r in recipes
         ]
         table = self.query_one("#suggestions", DataTable)
         table.clear()
@@ -702,11 +714,12 @@ class CodenameApp(App[None]):
         """Rendert die Custom-Seed-Recipes mit aktueller Mutation/Wortzahl."""
         if not self._custom_seed:
             return
-        theme = self.generator.seeded_theme(self._custom_seed, self._seed_language)
+        theme = self.generator.seeded_theme(self._custom_seed, self.content_language)
         mutation = self.mutation_percent / 100.0
         recipes = self._recipes.get(CUSTOM_SEED_SLUG, [])
         self.suggestions = [
-            self.generator.render(r, theme, self.word_count, mutation) for r in recipes
+            self.generator.render(r, theme, self.word_count, mutation, self.content_language)
+            for r in recipes
         ]
         table = self.query_one("#suggestions", DataTable)
         table.clear()
@@ -957,11 +970,29 @@ class CodenameApp(App[None]):
         self._rerender()
 
     async def action_cycle_language(self) -> None:
-        """Schaltet den Sprachfilter der Theme-Liste weiter (alle -> en -> de -> ...)."""
+        """Schaltet die Sprache weiter - dasselbe wie das Dropdown im Panel."""
         if len(self.languages) < 2:
             return
-        options = ["", *self.languages]
-        self._language_filter = options[(options.index(self._language_filter) + 1) % len(options)]
+        index = self.languages.index(self.content_language)
+        await self._apply_language(self.languages[(index + 1) % len(self.languages)])
+
+    async def on_select_changed(self, event: Select.Changed) -> None:
+        """Sprachauswahl im Settings-Panel."""
+        if event.select.id != "language-select":
+            return
+        if isinstance(event.value, str):
+            await self._apply_language(event.value)
+
+    async def _apply_language(self, language: str) -> None:
+        """Uebernimmt eine neue Sprache: Liste, Modifier und Vorschlaege ziehen nach."""
+        if language == self.content_language or language not in self.languages:
+            return
+        self.content_language = language
+        # Das Dropdown nachziehen, falls der Wechsel von der Taste kam. Ein
+        # erneutes Changed-Event laeuft oben in den Frueh-Return.
+        self.query_one("#language-select", Select).value = language
+        # Die Recipes tragen die Modifier der alten Sprache - alle verwerfen.
+        self._recipes.clear()
         visible = self._visible_theme_slugs()
         if not visible:
             return
@@ -969,16 +1000,17 @@ class CodenameApp(App[None]):
         list_view = self.query_one("#theme-list", ListView)
         await list_view.clear()
         await list_view.extend(self._theme_items())
-        # Faellt das aktive Theme aus dem Filter, uebernimmt das erste sichtbare.
+        # Faellt das aktive Theme aus der Sprache, uebernimmt das erste sichtbare.
         if self.theme_slug not in visible:
             self.theme_slug = visible[0]
             self.sub_title = self.theme_slug
             self._favorites_mode = False
             self._seed_mode = False
             self._apply_theme_default_mutation()
-            self._ensure_recipes()
         list_view.index = 2 + visible.index(self.theme_slug)
-        self._log_event(f"language -> [b]{self._language_filter or 'all'}[/b]")
+        self._ensure_recipes()
+        self._ensure_seed_recipes()
+        self._log_event(f"language -> [b]{self.content_language}[/b]")
         self._save_settings()
         self._rerender()
 

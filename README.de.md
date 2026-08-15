@@ -25,6 +25,12 @@ Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder �
 
 Deutsche Themen (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
+Themen, deren Wörter Eigennamen sind (griechische/ägyptische/nordische Götter,
+Rennpferde, Berge, Wahrzeichen, historische Schiffe, Whisky, Weine,
+Swatch-Uhren), stehen auf `language: neutral`. Sie erscheinen in jeder Sprache
+und übernehmen die Modifikatoren der gewählten - `Silent Secretariat` auf
+Englisch, `Stiller Secretariat` auf Deutsch.
+
 Zwei Themen nutzen ihre eigenen kuratierten Wort-Pools:
 
 - **Evocative** - ein markantes Adjektiv + ein emotional aufgeladenes Substantiv
@@ -55,11 +61,12 @@ run.bat          # Windows
 uv run codename  # jede Plattform
 ```
 
-Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `l` Sprachfilter · `a` Info · `q` beenden
+Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `l` Sprache · `a` Info · `q` beenden
 
-Das linke Einstellungspanel hat drei Schieberegler: **Mutationswahrscheinlichkeit**
+Das linke Einstellungspanel hat drei Schieberegler - **Mutationswahrscheinlichkeit**
 (0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Wörter pro Name) und
-**Vorschläge** (10/20/30/40 Namen pro Stapel). Das Verschieben eines Reglers
+**Vorschläge** (10/20/30/40 Namen pro Stapel) - dazu eine Auswahlliste für die
+**Sprache** (siehe [Sprachen](#sprachen)). Das Verschieben eines Reglers
 rendert den *aktuellen* Satz von Namen direkt neu, sodass du den Effekt sofort
 siehst — nur `r` zieht einen frischen Stapel. Jedes Thema behält seinen
 eigenen Satz, sodass das Hin- und Herwechseln zwischen Themen nie verliert, was
@@ -82,8 +89,9 @@ uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 uv run codename -t random -n 20         # pulls from every theme
 uv run codename -t whisky --words 3     # exactly 3 components per name
-uv run codename --list-themes --lang de  # nur die deutschen Themen
+uv run codename --list-themes --lang de  # deutsche plus neutrale Themen
 uv run codename -t tierwelt -n 10       # deutsche Namen, korrekt gebeugt
+uv run codename -t swatch --lang de      # Eigennamen, deutsche Modifikatoren
 ```
 
 Ein `*` neben einem Vorschlag bedeutet, dass eine phonetische Mutation angewendet wurde
@@ -105,7 +113,9 @@ words:
 
 Ein Thema gibt seine Sprache an, und die Sprache entscheidet, aus welchen
 Modifikator-Pools es zieht, wie der Name zusammengesetzt wird und ob der
-Modifikator gebeugt wird. Themen ohne `language`-Schlüssel sind englisch.
+Modifikator gebeugt wird. Themen ohne `language`-Schlüssel sind englisch. Ein
+Thema aus Eigennamen bekommt `language: neutral` - es bleibt in jeder Sprache
+sichtbar und borgt sich die Modifikatoren der gerade aktiven.
 
 ```yaml
 name: Tierwelt
@@ -134,8 +144,13 @@ deshalb entfällt `theme-verb` ("Falke Jagend") und dreiteilige Namen nutzen
 
 Jede Sprache bekommt ihr eigenes **Random**-Thema (`random`, `random-de`, ...),
 damit ein gepoolter Zug nie ein deutsches Substantiv mit einem englischen
-Adjektiv kombiniert. In der TUI schaltet `l` den Sprachfilter der Themenliste
-weiter, `--lang` tut dasselbe für `--list-themes`. Slugs bleiben ASCII:
+Adjektiv kombiniert - die neutralen Themen fließen in alle ein.
+
+Die Sprache wählst du im Einstellungspanel (unterste Auswahlliste) oder
+schaltest sie mit `l` weiter. Die Themenliste zeigt dann diese Sprache plus
+die neutralen Themen, und jeder Name wird mit deren Modifikatoren erzeugt. Auf
+der CLI macht `--lang` dasselbe, für `--list-themes` wie für die Generierung.
+Die Einstellung wird wie die Schieberegler gespeichert. Slugs bleiben ASCII:
 Umlaute werden ausgeschrieben (`Grüner Blitz -> gruener-blitz`), Akzente
 fallen weg (`Volupté -> volupte`).
 

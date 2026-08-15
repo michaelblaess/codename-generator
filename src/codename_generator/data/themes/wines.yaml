@@ -1,5 +1,6 @@
 name: Wines
 description: Grape varieties and famous wine regions
+language: neutral
 words:
   - Riesling
   - Chardonnay

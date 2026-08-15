@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from codename_generator.generator import Generator
+from codename_generator.wordlist import NEUTRAL_LANGUAGE
 
 # Mutationswahrscheinlichkeit, wenn weder Aufruf noch Theme etwas vorgeben.
 DEFAULT_MUTATION_CHANCE = 0.35
@@ -51,7 +52,7 @@ def main() -> int:
         "--lang",
         "-L",
         default=None,
-        help="Only list themes of this language (e.g. en, de)",
+        help="Language for neutral themes and for --list-themes (e.g. en, de)",
     )
     args = parser.parse_args()
 
@@ -63,7 +64,7 @@ def main() -> int:
             return 0
         gen = Generator.load(seed=args.seed)
         for slug, theme in gen.themes.items():
-            if args.lang and theme.language != args.lang:
+            if args.lang and theme.language not in (args.lang, NEUTRAL_LANGUAGE):
                 continue
             print(f"{slug:24s}  [{theme.language}]  {theme.name} ({len(theme.words)} words)")
         return 0
@@ -78,6 +79,7 @@ def main() -> int:
                 selected.default_mutation if selected else None, args.mutation_chance
             ),
             word_count=args.words,
+            language=args.lang,
         )
     except KeyError as exc:
         print(f"Error: {exc}", file=sys.stderr)

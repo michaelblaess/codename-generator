@@ -275,6 +275,6 @@ def test_random_theme_exists_and_pools_words() -> None:
     random_words = set(gen.themes["random"].words)
     other_words: set[str] = set()
     for slug, theme in gen.themes.items():
-        if not slug.startswith("random") and theme.language == "en":
+        if not slug.startswith("random") and theme.language in ("en", "neutral"):
             other_words.update(theme.words)
     assert random_words == other_words
