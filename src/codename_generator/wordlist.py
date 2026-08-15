@@ -11,6 +11,12 @@ _DATA_ROOT = Path(__file__).parent / "data"
 # wenn eine Sprache keine eigenen Modifier-Pools mitbringt.
 DEFAULT_LANGUAGE = "en"
 
+# Themes, deren Woerter Eigennamen sind (Goetter, Rennpferde, Swatch-Modelle),
+# gehoeren keiner Sprache an. Sie erscheinen in jeder Sprache und bekommen die
+# Modifier der gerade gewaehlten - "Stiller Secretariat" statt "Silent
+# Secretariat", wenn Deutsch aktiv ist.
+NEUTRAL_LANGUAGE = "neutral"
+
 # Trennzeichen fuer das Genus eines Theme-Worts: "Falke|m". Nur Sprachen mit
 # Adjektivflexion (Deutsch) brauchen das, alle anderen lassen es weg.
 _GENDER_SEPARATOR = "|"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from codename_generator.generator import Generator, Pattern, _slugify
+from codename_generator.generator import Generator, Pattern, _slugify, effective_language
 from codename_generator.wordlist import available_languages, load_modifiers, load_themes
 
 _GERMAN_THEME = "tierwelt"
@@ -83,7 +83,7 @@ def test_random_themes_do_not_mix_languages() -> None:
         language: {
             w
             for slug, t in gen.themes.items()
-            if t.language == language and not slug.startswith("random")
+            if t.language in (language, "neutral") and not slug.startswith("random")
             for w in t.words
         }
         for language in ("en", "de")
@@ -92,6 +92,52 @@ def test_random_themes_do_not_mix_languages() -> None:
     assert set(gen.themes["random-de"].words) == by_language["de"]
     # Das deutsche Random-Theme behaelt die Genus-Information.
     assert len(gen.themes["random-de"].genders) == len(gen.themes["random-de"].words)
+
+
+def test_neutral_themes_follow_the_chosen_language() -> None:
+    """Ein Eigennamen-Theme zieht die Modifier der gewaehlten Sprache."""
+    gen = Generator.load(seed=13)
+    german = set(gen.modifiers["de"]["adjectives"].words)
+    english = set(gen.modifiers["en"]["adjectives"].words)
+    for recipe in gen.generate_recipes("racehorses", count=15, language="de"):
+        assert recipe.adjective in german
+    for recipe in gen.generate_recipes("racehorses", count=15, language="en"):
+        assert recipe.adjective in english
+
+
+def test_neutral_theme_is_inflected_when_german_is_active() -> None:
+    """Ohne Genus-Marker gilt das Maskulinum - "Stiller Secretariat"."""
+    gen = Generator.load(seed=13)
+    suggestions = gen.suggest("swatch", count=30, mutation_chance=0.0, word_count=2, language="de")
+    front = [s for s in suggestions if s.pattern in (Pattern.ADJ_THEME, Pattern.VERB_THEME)]
+    assert front
+    for s in front:
+        assert s.name.split()[0].endswith(("er", "es", "e"))
+
+
+def test_language_does_not_override_a_bound_theme() -> None:
+    """Ein deutsches Theme bleibt deutsch, auch wenn Englisch gewaehlt ist."""
+    gen = Generator.load(seed=13)
+    german = set(gen.modifiers["de"]["adjectives"].words)
+    for recipe in gen.generate_recipes(_GERMAN_THEME, count=15, language="en"):
+        assert recipe.adjective in german
+
+
+def test_effective_language_resolution() -> None:
+    themes = load_themes()
+    assert effective_language(themes["swatch"], "de") == "de"
+    assert effective_language(themes["swatch"], None) == "en"
+    assert effective_language(themes[_GERMAN_THEME], "en") == "de"
+    assert effective_language(themes["animals"], "de") == "en"
+
+
+def test_neutral_themes_are_declared() -> None:
+    """Eigennamen-Themes sind als neutral markiert, Gattungswoerter nicht."""
+    themes = load_themes()
+    for slug in ("swatch", "racehorses", "whisky", "greek-gods", "mountains"):
+        assert themes[slug].language == "neutral", slug
+    for slug in ("animals", "flowers", "gemstones", "zodiac", "constellations"):
+        assert themes[slug].language == "en", slug
 
 
 def test_german_theme_uses_german_modifiers() -> None:

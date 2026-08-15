@@ -1,5 +1,6 @@
 name: Greek Gods
 description: Olympian gods, titans, and figures from Greek mythology
+language: neutral
 words:
   - Zeus
   - Hera

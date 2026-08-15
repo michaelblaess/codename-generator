@@ -25,6 +25,12 @@ Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals
 
 German themes (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
+Themes whose words are proper names (Greek/Egyptian/Norse gods, racehorses,
+mountains, landmarks, historic ships, whisky, wines, Swatch watches) are marked
+`language: neutral`. They show up in every language and take the modifiers of
+the one you picked - `Silent Secretariat` in English, `Stiller Secretariat` in
+German.
+
 Two themes use their own curated word pools:
 
 - **Evocative** - a stark adjective + an emotionally charged noun
@@ -55,11 +61,12 @@ run.bat          # Windows
 uv run codename  # any platform
 ```
 
-Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `l` language filter · `a` about · `q` quit
+Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `l` language · `a` about · `q` quit
 
-The left settings panel has three sliders: **mutation chance** (0-100%),
+The left settings panel has three sliders - **mutation chance** (0-100%),
 **word count** (1, 2 or 3 visible words per name) and **suggestions**
-(10/20/30/40 names per batch). Moving a slider re-renders the *current* set of
+(10/20/30/40 names per batch) - plus a **language** dropdown (see
+[Languages](#languages)). Moving a slider re-renders the *current* set of
 names in place so you see the effect immediately — only `r` draws a fresh
 batch. Each theme keeps its own set, so switching themes back and forth never
 loses what you had. Hover a theme in the list for a tooltip describing it.
@@ -80,8 +87,9 @@ uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 uv run codename -t random -n 20         # pulls from every theme
 uv run codename -t whisky --words 3     # exactly 3 components per name
-uv run codename --list-themes --lang de  # only the German themes
+uv run codename --list-themes --lang de  # German plus the neutral themes
 uv run codename -t tierwelt -n 10       # German names, inflected
+uv run codename -t swatch --lang de      # proper names, German modifiers
 ```
 
 A `*` next to a suggestion means a phonetic mutation was applied
@@ -103,7 +111,9 @@ words:
 
 A theme declares its language, and that language decides which modifier pools
 it draws from, how the name is put together and whether the modifier gets
-inflected. Themes without a `language` key are English.
+inflected. Themes without a `language` key are English. A theme of proper
+names uses `language: neutral` - it stays visible in every language and
+borrows the modifiers of whichever one is active.
 
 ```yaml
 name: Tierwelt
@@ -131,9 +141,14 @@ Word order differs too: German never trails a participle, so `theme-verb`
 ("Stiller Jagender Falke") instead of `adj-theme-verb`.
 
 Each language gets its own **Random** theme (`random`, `random-de`, ...) so
-pooled draws never mix a German noun with an English adjective. In the TUI,
-`l` cycles the language filter of the theme list, `--lang` does the same for
-`--list-themes`. Slugs stay ASCII: umlauts are written out
+pooled draws never mix a German noun with an English adjective - neutral
+themes feed into all of them.
+
+Pick the language in the settings panel (bottom dropdown) or cycle it with
+`l`. The theme list then shows that language plus the neutral themes, and
+every name is generated with its modifiers. On the CLI, `--lang` does the same
+for `--list-themes` and for generation. The setting is persisted like the
+sliders. Slugs stay ASCII: umlauts are written out
 (`Grüner Blitz -> gruener-blitz`), accents are stripped
 (`Volupté -> volupte`).
 

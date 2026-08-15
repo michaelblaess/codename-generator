@@ -11,6 +11,7 @@ from codename_generator.grammar import GERMAN, inflect_attribute
 from codename_generator.phonetic import mutate
 from codename_generator.wordlist import (
     DEFAULT_LANGUAGE,
+    NEUTRAL_LANGUAGE,
     WordList,
     load_all_modifiers,
     load_themes,
@@ -169,21 +170,34 @@ def _patterns_from_strings(values: tuple[str, ...]) -> tuple[Pattern, ...]:
     return tuple(result)
 
 
+def effective_language(theme: WordList, language: str | None = None) -> str:
+    """Sprache, in der ein Theme benannt wird.
+
+    Ein sprachgebundenes Theme bestimmt sie selbst - ein deutsches Theme bleibt
+    deutsch, egal was eingestellt ist. Nur neutrale Themes (Eigennamen) folgen
+    der gewaehlten Sprache.
+    """
+    if theme.language != NEUTRAL_LANGUAGE:
+        return theme.language
+    return language or DEFAULT_LANGUAGE
+
+
 def _random_slug(language: str) -> str:
     """Slug des Random-Themes einer Sprache (`random`, `random-de`, ...)."""
     return RANDOM_THEME_SLUG if language == DEFAULT_LANGUAGE else f"{RANDOM_THEME_SLUG}-{language}"
 
 
 def _build_random_theme(themes: dict[str, WordList], language: str) -> WordList:
-    """Virtuelles Random-Theme: alle Woerter EINER Sprache zusammen.
+    """Virtuelles Random-Theme: die Woerter EINER Sprache plus die neutralen.
 
-    Sprachen bleiben getrennt, sonst wuerde ein deutsches Wort mit englischen
-    Modifiern kombiniert (und umgekehrt).
+    Sprachgebundene Themes bleiben getrennt, sonst wuerde ein deutsches Wort
+    mit englischen Modifiern kombiniert (und umgekehrt). Neutrale Themes
+    (Eigennamen) gehoeren in jeden Pool.
     """
     # Genus mitnehmen, sonst verliert der Pool die Flexionsinformation.
     pooled: dict[str, str] = {}
     for theme in themes.values():
-        if theme.language != language:
+        if theme.language not in (language, NEUTRAL_LANGUAGE):
             continue
         for word in theme.words:
             pooled.setdefault(word, theme.gender_of(word))
@@ -212,22 +226,24 @@ class Generator:
     @classmethod
     def load(cls, seed: int | None = None) -> Generator:
         themes = load_themes()
+        modifiers = load_all_modifiers()
         # Pro Sprache ein Random-Theme, damit nichts sprachuebergreifend mischt.
         # Die Default-Sprache steht vorn - ihr Random-Theme ist der Startpunkt
         # der Theme-Liste.
-        languages = sorted(
-            {t.language for t in themes.values()},
-            key=lambda lang: (lang != DEFAULT_LANGUAGE, lang),
-        )
+        languages = sorted(modifiers, key=lambda lang: (lang != DEFAULT_LANGUAGE, lang))
         themes_with_random: dict[str, WordList] = {
             _random_slug(language): _build_random_theme(themes, language) for language in languages
         }
         themes_with_random.update(themes)
         return cls(
             themes=themes_with_random,
-            modifiers=load_all_modifiers(),
+            modifiers=modifiers,
             rng=random.Random(seed),
         )
+
+    def languages(self) -> tuple[str, ...]:
+        """Sprachen, in denen generiert werden kann - Default-Sprache zuerst."""
+        return tuple(sorted(self.modifiers, key=lambda lang: (lang != DEFAULT_LANGUAGE, lang)))
 
     def _modifier_pool(self, language: str, role: str) -> tuple[str, ...]:
         """Woerter eines Modifier-Pools, mit Rueckfall auf die Default-Sprache."""
@@ -294,19 +310,26 @@ class Generator:
             language=language,
         )
 
-    def generate_recipes(self, theme_slug: str, count: int = 30) -> list[Recipe]:
-        """Erzeugt `count` zufaellige Recipes - jedes Theme-Wort nur einmal."""
+    def generate_recipes(
+        self, theme_slug: str, count: int = 30, language: str | None = None
+    ) -> list[Recipe]:
+        """Erzeugt `count` zufaellige Recipes - jedes Theme-Wort nur einmal.
+
+        `language` greift nur bei neutralen Themes (Eigennamen) - sie ziehen
+        die Modifier der gewaehlten Sprache.
+        """
         if theme_slug not in self.themes:
             raise KeyError(f"Unknown theme: {theme_slug}")
         theme = self.themes[theme_slug]
-        adjectives = theme.adjectives or self._modifier_pool(theme.language, "adjectives")
-        verbs = theme.verbs or self._modifier_pool(theme.language, "verbs")
-        agents = self._modifier_pool(theme.language, "agents")
+        lang = effective_language(theme, language)
+        adjectives = theme.adjectives or self._modifier_pool(lang, "adjectives")
+        verbs = theme.verbs or self._modifier_pool(lang, "verbs")
+        agents = self._modifier_pool(lang, "agents")
         recipes: list[Recipe] = []
         seen: set[str] = set()
         attempts = 0
         max_attempts = count * 40
-        pattern_choices = len(_two_word_patterns(theme.language))
+        pattern_choices = len(_two_word_patterns(lang))
         while len(recipes) < count and attempts < max_attempts:
             attempts += 1
             theme_word = self.rng.choice(theme.words)
@@ -328,7 +351,9 @@ class Generator:
         return recipes
 
     @staticmethod
-    def _select_pattern(theme: WordList, recipe: Recipe, word_count: int) -> Pattern:
+    def _select_pattern(
+        theme: WordList, recipe: Recipe, word_count: int, language: str | None = None
+    ) -> Pattern:
         """Waehlt das Pattern so, dass der Name `word_count` SICHTBARE Woerter hat.
 
         Theme-Woerter koennen selbst mehrteilig sein (z.B. "Hoover Dam" = 2
@@ -347,10 +372,11 @@ class Generator:
         if modifiers <= 0:
             # Theme-Wort fuellt das Budget bereits aus (oder ueberschreitet es).
             return Pattern.THEME_ONLY
+        lang = effective_language(theme, language)
         if modifiers == 1:
-            choices = _two_word_patterns(theme.language)
+            choices = _two_word_patterns(lang)
             return choices[recipe.pattern_index % len(choices)]
-        return _three_word_pattern(theme.language)
+        return _three_word_pattern(lang)
 
     def render(
         self,
@@ -358,10 +384,15 @@ class Generator:
         theme: WordList,
         word_count: int = 2,
         mutation_chance: float = 0.35,
+        language: str | None = None,
     ) -> Suggestion:
         """Macht aus einem Recipe eine konkrete Suggestion fuer die aktuellen
-        Mutation-/Wortzahl-Einstellungen."""
-        pattern = self._select_pattern(theme, recipe, word_count)
+        Mutation-/Wortzahl-Einstellungen.
+
+        `language` wirkt nur auf neutrale Themes (Eigennamen) - sie werden in
+        der gewaehlten Sprache gebeugt und angeordnet.
+        """
+        pattern = self._select_pattern(theme, recipe, word_count, language)
 
         rendered = recipe.theme_word
         mutated = False
@@ -377,9 +408,10 @@ class Generator:
         # siehe grammar.py). Das Genus haengt am Original-Wort, nicht an der
         # mutierten Form. Die gebeugte Form wandert auch in `sources`, damit
         # ein Favorit spaeter ohne Theme-Kontext korrekt gerendert wird.
+        lang = effective_language(theme, language)
         gender = theme.gender_of(recipe.theme_word)
-        adjective = inflect_attribute(recipe.adjective, gender, theme.language)
-        attributive_verb = inflect_attribute(recipe.verb, gender, theme.language)
+        adjective = inflect_attribute(recipe.adjective, gender, lang)
+        attributive_verb = inflect_attribute(recipe.verb, gender, lang)
 
         sources: tuple[str, ...]
         match pattern:
@@ -455,11 +487,13 @@ class Generator:
         count: int = 10,
         mutation_chance: float = 0.35,
         word_count: int = 2,
+        language: str | None = None,
     ) -> list[Suggestion]:
         """Einmalige Generierung: Recipes erzeugen und direkt rendern.
 
         `word_count` legt die exakte Anzahl der Namens-Komponenten fest (1..3).
+        `language` wirkt nur auf neutrale Themes (Eigennamen).
         """
-        recipes = self.generate_recipes(theme_slug, count)
+        recipes = self.generate_recipes(theme_slug, count, language)
         theme = self.themes[theme_slug]
-        return [self.render(r, theme, word_count, mutation_chance) for r in recipes]
+        return [self.render(r, theme, word_count, mutation_chance, language) for r in recipes]

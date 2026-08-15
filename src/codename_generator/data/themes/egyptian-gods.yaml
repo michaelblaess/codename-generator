@@ -1,5 +1,6 @@
 name: Egyptian Gods
 description: Gods and goddesses from ancient Egyptian mythology
+language: neutral
 words:
   - Ra
   - Anubis

@@ -1,5 +1,6 @@
 name: Landmarks
 description: Famous landmarks and monuments around the world
+language: neutral
 words:
   - Acropolis
   - Alhambra
