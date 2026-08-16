@@ -41,9 +41,18 @@ Homepage = "https://github.com/michaelblaess/codename-generator"
 Repository = "https://github.com/michaelblaess/codename-generator"
 Issues = "https://github.com/michaelblaess/codename-generator/issues"
 
+[tool.uv]
+# textual-themes zieht textual-widgets von einem beweglichen Branch, hier ist es
+# auf ein Tag gepinnt. Ohne Override sieht uv zwei verschiedene URLs fuer
+# dasselbe Paket und bricht die Aufloesung ab. Der Override legt beide Seiten
+# auf dieselbe Fassung fest.
+override-dependencies = [
+    "textual-widgets @ git+https://github.com/michaelblaess/textual-widgets.git@v0.21.0",
+]
+
 [tool.uv.sources]
 textual-widgets = { git = "https://github.com/michaelblaess/textual-widgets.git", tag = "v0.21.0" }
-textual-themes = { git = "https://github.com/michaelblaess/textual-themes.git", tag = "v0.2.1" }
+textual-themes = { git = "https://github.com/michaelblaess/textual-themes.git", tag = "v0.11.0" }
 
 [dependency-groups]
 dev = [
