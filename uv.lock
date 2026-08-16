@@ -6,9 +6,6 @@ resolution-markers = [
     "python_full_version < '3.15'",
 ]
 
-[manifest]
-overrides = [{ name = "textual-widgets", git = "https://github.com/michaelblaess/textual-widgets.git?tag=v0.21.0" }]
-
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -196,7 +193,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "textual", specifier = ">=0.83" },
     { name = "textual-slider", specifier = ">=0.1.0" },
-    { name = "textual-themes", git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.11.0" },
+    { name = "textual-themes", git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.12.0" },
     { name = "textual-widgets", git = "https://github.com/michaelblaess/textual-widgets.git?tag=v0.21.0" },
 ]
 
@@ -908,11 +905,10 @@ wheels = [
 
 [[package]]
 name = "textual-themes"
-version = "0.11.0"
-source = { git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.11.0#bb07132f6b86aec0bd57cfc2d137382f2f134fb5" }
+version = "0.12.0"
+source = { git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.12.0#2a42d83536b79d0031a2012dcfb535a0ec7efcd0" }
 dependencies = [
     { name = "textual" },
-    { name = "textual-widgets" },
 ]
 
 [[package]]
