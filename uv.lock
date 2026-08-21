@@ -193,7 +193,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "textual", specifier = ">=0.83" },
     { name = "textual-slider", specifier = ">=0.1.0" },
-    { name = "textual-themes", git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.12.0" },
+    { name = "textual-themes", git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.14.0" },
     { name = "textual-widgets", git = "https://github.com/michaelblaess/textual-widgets.git?tag=v0.21.0" },
 ]
 
@@ -905,8 +905,8 @@ wheels = [
 
 [[package]]
 name = "textual-themes"
-version = "0.12.0"
-source = { git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.12.0#2a42d83536b79d0031a2012dcfb535a0ec7efcd0" }
+version = "0.14.0"
+source = { git = "https://github.com/michaelblaess/textual-themes.git?tag=v0.14.0#8ea46d3294aa2fef60827d805f85e1251f6aa852" }
 dependencies = [
     { name = "textual" },
 ]

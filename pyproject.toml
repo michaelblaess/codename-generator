@@ -43,7 +43,7 @@ Issues = "https://github.com/michaelblaess/codename-generator/issues"
 
 [tool.uv.sources]
 textual-widgets = { git = "https://github.com/michaelblaess/textual-widgets.git", tag = "v0.21.0" }
-textual-themes = { git = "https://github.com/michaelblaess/textual-themes.git", tag = "v0.12.0" }
+textual-themes = { git = "https://github.com/michaelblaess/textual-themes.git", tag = "v0.14.0" }
 
 [dependency-groups]
 dev = [
