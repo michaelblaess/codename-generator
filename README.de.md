@@ -25,7 +25,7 @@ Ein Codename-Generator für das Terminal. Wähle ein Thema (griechische Götter,
 
 ## Themen
 
-Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Gefährliche Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Swatch-Uhren · Dev · Random (gepoolt)
+Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Gefährliche Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Swatch-Uhren · Dev · Flugsicherung · Random (gepoolt)
 
 Deutsche Themen (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 

@@ -25,7 +25,7 @@ A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, 
 
 ## Themes
 
-Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Swatch watches · Dev · Random (pooled)
+Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Swatch watches · Dev · Air traffic control · Random (pooled)
 
 German themes (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
