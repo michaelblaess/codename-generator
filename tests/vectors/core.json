@@ -1,0 +1,166 @@
+{
+  "_comment": [
+    "Gemeinsame Testvektoren fuer den Python-Kern und den TypeScript-Port in codename-generator.de.",
+    "Beide Suiten laufen gegen genau diese Datei (Web: per npm run daten kopiert).",
+    "Nur deterministische Teile. Die Zufallsgeneratoren unterscheiden sich bewusst.",
+    "mutate.script: Folge von Indizes fuer einen geskripteten Zufall.",
+    "choice(items) nimmt items[i % len], sample(items, k) nimmt k-mal pool.pop(i % len(pool))."
+  ],
+  "slugify": [
+    { "input": "Grüner Blitz", "expected": "gruener-blitz" },
+    { "input": "Weiße Möwe", "expected": "weisse-moewe" },
+    { "input": "Äskulapnatter", "expected": "aeskulapnatter" },
+    { "input": "Volupté", "expected": "volupte" },
+    { "input": "  Man o' War  ", "expected": "man-o-war" },
+    { "input": "Ægir", "expected": "aegir" },
+    { "input": "Œuvre", "expected": "oeuvre" },
+    { "input": "Søren", "expected": "soeren" },
+    { "input": "Straße 42", "expected": "strasse-42" },
+    { "input": "Hoover Dam", "expected": "hoover-dam" },
+    { "input": "C-3PO / R2-D2", "expected": "c-3po-r2-d2" },
+    { "input": "---", "expected": "" }
+  ],
+  "title": [
+    { "input": "silent falcon", "expected": "Silent Falcon" },
+    { "input": "man o' war", "expected": "Man O' War" },
+    { "input": "stürzender hirschkäfer", "expected": "Stürzender Hirschkäfer" },
+    { "input": "weiße möwe", "expected": "Weiße Möwe" },
+    { "input": "IRON HOUR", "expected": "Iron Hour" },
+    { "input": "3rd wave", "expected": "3Rd Wave" },
+    { "input": "sitemap-pioneer", "expected": "Sitemap-Pioneer" },
+    { "input": "stille œuvre", "expected": "Stille Œuvre" },
+    { "input": "cold ørsted", "expected": "Cold Ørsted" },
+    { "input": "swift łódź", "expected": "Swift Łódź" }
+  ],
+  "inflect": [
+    { "word": "still", "gender": "m", "language": "de", "expected": "stiller" },
+    { "word": "still", "gender": "f", "language": "de", "expected": "stille" },
+    { "word": "still", "gender": "n", "language": "de", "expected": "stilles" },
+    { "word": "still", "gender": "p", "language": "de", "expected": "stille" },
+    { "word": "still", "gender": "", "language": "de", "expected": "stiller" },
+    { "word": "dunkel", "gender": "m", "language": "de", "expected": "dunkler" },
+    { "word": "edel", "gender": "n", "language": "de", "expected": "edles" },
+    { "word": "leise", "gender": "m", "language": "de", "expected": "leiser" },
+    { "word": "leise", "gender": "f", "language": "de", "expected": "leise" },
+    { "word": "leise", "gender": "n", "language": "de", "expected": "leises" },
+    { "word": "jagend", "gender": "f", "language": "de", "expected": "jagende" },
+    { "word": "still", "gender": "x", "language": "de", "expected": "still" },
+    { "word": "silent", "gender": "f", "language": "en", "expected": "silent" },
+    { "word": "", "gender": "m", "language": "de", "expected": "" }
+  ],
+  "mutate": [
+    { "word": "Pegasus", "script": [0, 1, 0], "expected": "Pegosus" },
+    { "word": "Pegasus", "script": [1, 0, 2], "expected": "Pegasyr" },
+    { "word": "Pegasus", "script": [2, 0], "expected": "Peggasus" },
+    { "word": "Pegasus", "script": [2, 1], "expected": "Pegassus" },
+    { "word": "Constellation", "script": [3], "expected": "Constellati" },
+    { "word": "Atlas", "script": [0, 0, 0], "expected": "Otlas" },
+    { "word": "ZEUS", "script": [1, 0, 0], "expected": "ZEOS" },
+    { "word": "Lyra", "script": [0, 1, 1], "expected": "Lyre" },
+    { "word": "Lyra", "script": [0, 0, 0], "expected": "Lira" },
+    { "word": "Ra", "script": [3], "expected": "Ra" },
+    { "word": "Brr", "script": [0], "expected": "Brr" },
+    { "word": "Zeus", "script": [], "intensity": 0, "expected": "Zeus" },
+    { "word": "Pegasus", "script": [1, 0, 0, 0, 1, 0], "intensity": 2, "expected": "Pegosos" }
+  ],
+  "render": [
+    {
+      "_note": "Englisch, zwei Woerter, Adjektiv vorn",
+      "theme": { "words": ["Falcon"], "language": "en" },
+      "recipe": { "theme_word": "Falcon", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 0 },
+      "word_count": 2, "language": "en",
+      "expected": { "name": "Silent Falcon", "slug": "silent-falcon", "pattern": "adj-theme", "sources": ["Falcon", "silent"] }
+    },
+    {
+      "_note": "Englisch, Verb nachgestellt",
+      "theme": { "words": ["Falcon"], "language": "en" },
+      "recipe": { "theme_word": "Falcon", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 2 },
+      "word_count": 2, "language": "en",
+      "expected": { "name": "Falcon Hunting", "slug": "falcon-hunting", "pattern": "theme-verb", "sources": ["Falcon", "hunting"] }
+    },
+    {
+      "_note": "Agent leer: Ausweichen auf das Verb",
+      "theme": { "words": ["Falcon"], "language": "en" },
+      "recipe": { "theme_word": "Falcon", "adjective": "silent", "verb": "hunting", "agent": "", "pattern_index": 3 },
+      "word_count": 2, "language": "en",
+      "expected": { "name": "Falcon Hunting", "slug": "falcon-hunting", "pattern": "theme-agent", "sources": ["Falcon", "hunting"] }
+    },
+    {
+      "_note": "pattern_index laeuft modulo ueber die Auswahl",
+      "theme": { "words": ["Falcon"], "language": "en" },
+      "recipe": { "theme_word": "Falcon", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 7 },
+      "word_count": 2, "language": "en",
+      "expected": { "name": "Falcon Runner", "slug": "falcon-runner", "pattern": "theme-agent", "sources": ["Falcon", "runner"] }
+    },
+    {
+      "_note": "Ein Wort: nur das Themenwort",
+      "theme": { "words": ["Falcon"], "language": "en" },
+      "recipe": { "theme_word": "Falcon", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 0 },
+      "word_count": 1, "language": "en",
+      "expected": { "name": "Falcon", "slug": "falcon", "pattern": "theme", "sources": ["Falcon"] }
+    },
+    {
+      "_note": "Englisch, drei Woerter",
+      "theme": { "words": ["Falcon"], "language": "en" },
+      "recipe": { "theme_word": "Falcon", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 1 },
+      "word_count": 3, "language": "en",
+      "expected": { "name": "Silent Falcon Hunting", "slug": "silent-falcon-hunting", "pattern": "adj-theme-verb", "sources": ["Falcon", "silent", "hunting"] }
+    },
+    {
+      "_note": "Mehrteiliges Themenwort fuellt das Budget",
+      "theme": { "words": ["Hoover Dam"], "language": "neutral" },
+      "recipe": { "theme_word": "Hoover Dam", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 0 },
+      "word_count": 2, "language": "en",
+      "expected": { "name": "Hoover Dam", "slug": "hoover-dam", "pattern": "theme", "sources": ["Hoover Dam"] }
+    },
+    {
+      "_note": "Mehrteiliges Themenwort plus ein Modifikator",
+      "theme": { "words": ["Hoover Dam"], "language": "neutral" },
+      "recipe": { "theme_word": "Hoover Dam", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 0 },
+      "word_count": 3, "language": "en",
+      "expected": { "name": "Silent Hoover Dam", "slug": "silent-hoover-dam", "pattern": "adj-theme", "sources": ["Hoover Dam", "silent"] }
+    },
+    {
+      "_note": "Deutsch, Femininum, Partizip vorangestellt",
+      "theme": { "words": ["Falke", "Eule"], "genders": ["m", "f"], "language": "de" },
+      "recipe": { "theme_word": "Eule", "adjective": "still", "verb": "jagend", "agent": "läufer", "pattern_index": 1 },
+      "word_count": 2, "language": "en",
+      "expected": { "name": "Jagende Eule", "slug": "jagende-eule", "pattern": "verb-theme", "sources": ["Eule", "jagende"] }
+    },
+    {
+      "_note": "Deutsch kennt kein theme-verb: Index 2 ist theme-agent",
+      "theme": { "words": ["Falke", "Eule"], "genders": ["m", "f"], "language": "de" },
+      "recipe": { "theme_word": "Falke", "adjective": "still", "verb": "jagend", "agent": "läufer", "pattern_index": 2 },
+      "word_count": 2, "language": "de",
+      "expected": { "name": "Falke Läufer", "slug": "falke-laeufer", "pattern": "theme-agent", "sources": ["Falke", "läufer"] }
+    },
+    {
+      "_note": "Deutsch, drei Woerter, Neutrum",
+      "theme": { "words": ["Wiesel"], "genders": ["n"], "language": "de" },
+      "recipe": { "theme_word": "Wiesel", "adjective": "dunkel", "verb": "lauernd", "agent": "", "pattern_index": 0 },
+      "word_count": 3, "language": "de",
+      "expected": { "name": "Dunkles Lauerndes Wiesel", "slug": "dunkles-lauerndes-wiesel", "pattern": "adj-verb-theme", "sources": ["Wiesel", "dunkles", "lauerndes"] }
+    },
+    {
+      "_note": "Neutrales Thema folgt der gewaehlten Sprache, ohne Genus maskulin",
+      "theme": { "words": ["Secretariat"], "language": "neutral" },
+      "recipe": { "theme_word": "Secretariat", "adjective": "still", "verb": "jagend", "agent": "", "pattern_index": 0 },
+      "word_count": 2, "language": "de",
+      "expected": { "name": "Stiller Secretariat", "slug": "stiller-secretariat", "pattern": "adj-theme", "sources": ["Secretariat", "stiller"] }
+    },
+    {
+      "_note": "Thema mit eigenen Patterns ueberstimmt die Wortzahl",
+      "theme": { "words": ["Mythos"], "patterns": ["theme"], "language": "en" },
+      "recipe": { "theme_word": "Mythos", "adjective": "silent", "verb": "hunting", "agent": "runner", "pattern_index": 0 },
+      "word_count": 3, "language": "en",
+      "expected": { "name": "Mythos", "slug": "mythos", "pattern": "theme", "sources": ["Mythos"] }
+    },
+    {
+      "_note": "Eigenes Wort mit Zeichen ausserhalb von Latin-1",
+      "theme": { "words": ["œuvre"], "language": "de" },
+      "recipe": { "theme_word": "œuvre", "adjective": "still", "verb": "jagend", "agent": "", "pattern_index": 0 },
+      "word_count": 2, "language": "de",
+      "expected": { "name": "Stiller Œuvre", "slug": "stiller-oeuvre", "pattern": "adj-theme", "sources": ["œuvre", "stiller"] }
+    }
+  ]
+}
