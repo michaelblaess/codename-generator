@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import dataclasses
 import re
 import sys
 from datetime import datetime
 from typing import ClassVar
 
-from rich.text import Text
+from rich.markup import escape
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.events import Click
+from textual.containers import Horizontal, Vertical
+from textual.events import Click, Mount
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import (
@@ -25,14 +26,17 @@ from textual.widgets import (
 from textual_slider import Slider
 from textual_themes import register_all
 from textual_widgets import (
+    AboutScreen,
     ContextMenuItem,
     ContextMenuScreen,
     HorizontalSplitter,
     TextInputScreen,
     VerticalSplitter,
+    vim_navigation_bindings,
 )
+from textual_widgets.keymap import KeyBinding, KeymapProblem
 
-from codename_generator import __author__, __version__, __year__
+from codename_generator import __author__, __version__, __year__, keymap
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
     RANDOM_THEME_SLUG,
@@ -43,7 +47,9 @@ from codename_generator.generator import (
     Suggestion,
     VariantKeep,
 )
+from codename_generator.keymap_screen import KeymapScreen
 from codename_generator.settings import JsonSettingsStore
+from codename_generator.settings_screen import CodenameSettingsScreen
 from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE, WordList
 
 # Auswahlwert "kein Partner-Thema" - der Custom Seed zieht dann Adjektive und
@@ -58,8 +64,6 @@ SEED_POSITION_LABELS: dict[AnchorPosition, str] = {
     AnchorPosition.FRONT: "Word in front",
     AnchorPosition.BACK: "Word at the back",
 }
-
-_DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
 
 # Anzeigenamen der Sprachen - Endonyme, damit jeder seine eigene wiedererkennt.
 LANGUAGE_LABELS: dict[str, str] = {"en": "English", "de": "Deutsch"}
@@ -80,6 +84,19 @@ class SuggestionsTable(DataTable[str]):
     wird. Darum faengt diese Unterklasse den Rechtsklick selbst ab, setzt den
     Cursor auf die getroffene Zeile und meldet sie per Message an die App.
     """
+
+    def _on_mount(self, event: Mount) -> None:
+        """Bindet die Vim-Navigation, wenn sie in den Einstellungen an ist.
+
+        Die Bindung haengt am Widget und nicht an der App, weil sie nur gelten
+        soll, solange die Tabelle den Fokus hat. Bewusst `_on_mount`: Textual
+        ruft jeden `_on_*`-Haken der MRO, ein oeffentliches `on_mount` wuerde
+        das einer Ableitung verdecken.
+        """
+        if not getattr(self.app, "vim_navigation", False):
+            return
+        for key, action in vim_navigation_bindings():
+            self._bindings.bind(key, action, show=False)
 
     class RightClicked(Message):
         """Meldet einen Rechtsklick auf eine Tabellenzeile an die App."""
@@ -134,129 +151,6 @@ class FavoritesScreen(ModalScreen[None]):
             if not self.favorites:
                 table.add_row("(no favorites yet)", "", "", "")
             yield table
-
-
-class AboutScreen(ModalScreen[None]):
-    """Modal-Dialog mit Informationen ueber die Anwendung."""
-
-    DEFAULT_CSS = """
-    AboutScreen {
-        align: center middle;
-    }
-
-    AboutScreen > VerticalScroll {
-        width: auto;
-        height: auto;
-        min-width: 56;
-        max-width: 90;
-        max-height: 90%;
-        background: $surface;
-        border: thick $accent;
-        padding: 1 2;
-    }
-
-    AboutScreen #about-title {
-        height: 3;
-        content-align: center middle;
-        text-style: bold;
-        background: $accent;
-        color: auto;
-        margin-bottom: 1;
-    }
-
-    AboutScreen #about-content {
-        height: auto;
-        padding: 1 2;
-    }
-
-    AboutScreen #about-footer {
-        height: 1;
-        content-align: center middle;
-        color: $text-muted;
-        margin-top: 1;
-    }
-    """
-
-    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
-        Binding("escape", "close", "ESC"),
-        Binding("a,A,q,Q,enter,space", "close", "Close"),
-    ]
-
-    def compose(self) -> ComposeResult:
-        with VerticalScroll():
-            yield Static("codename-generator", id="about-title")
-            yield Static(self._build_content(), id="about-content")
-            yield Static("press [b]a[/b] / [b]Esc[/b] to close", id="about-footer", markup=True)
-
-    def _build_content(self) -> Text:
-        text = Text()
-        text.append(f"v{__version__}", style="bold")
-        text.append(" - ", style="dim")
-        text.append(__author__, style="bold")
-        text.append(" - ", style="dim")
-        text.append(__year__, style="bold")
-        text.append("\n\n")
-
-        text.append("Project codename generator with curated themes\n")
-        text.append("and phonetic mutations.\n\n")
-
-        text.append("Themes  ", style="dim")
-        text.append(
-            "Greek/Egyptian/Norse Gods · Constellations · "
-            "Animals · Dangerous animals · Racehorses · Flowers · Gemstones · "
-            "Wines · Whisky · Mountains · Mushrooms · Ships · Landmarks · "
-            "Swatch · Random\n        "
-        )
-        text.append("Deutsch ", style="dim")
-        text.append("Tierwelt · Sagenwesen · Wetter und Landschaft\n        ")
-        text.append("Language", style="dim")
-        text.append(
-            "  themes of proper names (gods, racehorses, Swatch) follow\n"
-            "        the language picked in the settings panel\n\n"
-        )
-
-        text.append("Keys    ", style="dim")
-        text.append("r ", style="bold")
-        text.append("regenerate  ")
-        text.append("c ", style="bold")
-        text.append("copy slug  ")
-        text.append("n ", style="bold")
-        text.append("copy name\n        ")
-        text.append("m ", style="bold")
-        text.append("mutation  ")
-        text.append("t ", style="bold")
-        text.append("cycle theme  ")
-        text.append("f ", style="bold")
-        text.append("favorite\n        ")
-        text.append("v ", style="bold")
-        text.append("view favs  ")
-        text.append("i ", style="bold")
-        text.append("idea seed  ")
-        text.append("+ ", style="bold")
-        text.append("add idea\n        ")
-        text.append("l ", style="bold")
-        text.append("language  ")
-        text.append("a ", style="bold")
-        text.append("about  ")
-        text.append("q ", style="bold")
-        text.append("quit\n\n")
-
-        text.append("Mouse   ", style="dim")
-        text.append("right-click a suggestion for a context menu\n\n")
-
-        text.append("-" * 48 + "\n\n", style="dim")
-
-        text.append(
-            f'"{_DICKINSON_QUOTE}"\n\n',
-            style="italic",
-        )
-        text.append(" " * 22)
-        text.append("- Emily Dickinson", style="bold")
-
-        return text
-
-    def action_close(self) -> None:
-        self.dismiss(None)
 
 
 class CodenameApp(App[None]):
@@ -325,22 +219,8 @@ class CodenameApp(App[None]):
     }
     """
 
-    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
-        Binding("r,R", "regenerate", "Regenerate", key_display="r"),
-        Binding("c,C", "copy_slug", "Copy slug", key_display="c"),
-        Binding("n,N", "copy_name", "Copy name", key_display="n"),
-        Binding("m,M", "bump_mutation", "Mutation +25%", key_display="m"),
-        Binding("t,T", "cycle_theme", "Theme", key_display="t"),
-        Binding("f,F", "toggle_favorite", "Fav", key_display="f"),
-        Binding("v,V", "open_favorites", "View favs", key_display="v"),
-        Binding("i,I", "edit_seed", "Idea seed", key_display="i"),
-        Binding("w,W", "vary_word", "Keep word", key_display="w"),
-        Binding("k,K", "vary_modifier", "Keep mod", key_display="k"),
-        Binding("l,L", "cycle_language", "Language", key_display="l"),
-        Binding("plus", "add_custom_favorite", "Add idea", key_display="+"),
-        Binding("a,A", "about", "About", key_display="a"),
-        Binding("q,Q", "quit", "Quit", key_display="q"),
-    ]
+    # Die Tasten stehen in keymap.py und werden in __init__ gebunden - der Stil
+    # steht erst fest, wenn die Einstellungen geladen sind.
 
     MUTATION_DEFAULT: ClassVar[int] = 35
     MUTATION_BUMP: ClassVar[int] = 25
@@ -386,6 +266,12 @@ class CodenameApp(App[None]):
         partner = str(settings.get("seed_partner", ""))
         self._seed_partner = partner if partner in self.generator.themes else ""
         self._seed_position = self._coerce_position(settings.get("seed_position"))
+        # Tastenbelegung aus den Einstellungen. Beanstandungen gehoeren ins
+        # Log, das gibt es beim Binden aber noch nicht - also erst in on_mount.
+        self._vim_navigation = bool(settings.get("keymap_vim", False))
+        self._keymap_problems: tuple[KeymapProblem, ...] = ()
+        self._keymap: dict[str, KeyBinding] = {}
+        self._apply_keymap(settings)
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
         self.content_language = self._coerce_language(settings.get("language"))
         visible = self._visible_theme_slugs()
@@ -481,7 +367,11 @@ class CodenameApp(App[None]):
         ]
 
     def _save_settings(self) -> None:
-        self._settings_store.save(
+        # Zusammenfuehren statt ueberschreiben: sonst verschwinden Schluessel,
+        # die hier niemand aufzaehlt - keymap_custom zum Beispiel, das nur von
+        # Hand in die Datei kommt.
+        data = self._settings_store.load()
+        data.update(
             {
                 "theme": self.theme,
                 "mutation_percent": self.mutation_percent,
@@ -494,6 +384,7 @@ class CodenameApp(App[None]):
                 "language": self.content_language,
             }
         )
+        self._settings_store.save(data)
 
     def watch_theme(self, theme_name: str) -> None:
         """Persistiert jede Theme-Aenderung (auch via Ctrl+P Theme-Picker)."""
@@ -604,6 +495,7 @@ class CodenameApp(App[None]):
         # Indizes 0/1 sind Favorites/Custom Seed - Start auf dem ersten echten Theme.
         list_view.index = 2
         self._log_event(f"started - theme [b]{self.theme_slug}[/b]")
+        self._log_keymap_problems()
         self._ensure_recipes()
         self._rerender()
 
@@ -628,7 +520,9 @@ class CodenameApp(App[None]):
             kept = "word" if self._variant_keep == VariantKeep.WORD else "modifier"
             info.update(
                 f'[b]Variants[/b]  [dim]of "{self._variant_name}", {kept} kept - '
-                "[b]w[/b]/[b]k[/b] vary again, [b]r[/b] reroll, pick a theme to leave[/dim]"
+                f"[b]{self._key_hint('vary_word')}[/b]/[b]{self._key_hint('vary_modifier')}[/b] "
+                f"vary again, [b]{self._key_hint('regenerate')}[/b] reroll, "
+                "pick a theme to leave[/dim]"
             )
         else:
             info.update(
@@ -714,7 +608,7 @@ class CodenameApp(App[None]):
         where = SEED_POSITION_LABELS[self._seed_position].lower()
         self.query_one("#info", Static).update(
             f'[b]Custom Seed[/b]  [dim]your idea "{self._custom_seed}" with {partner}, '
-            f"{where} - press [b]i[/b] to change[/dim]"
+            f"{where} - press [b]{self._key_hint('edit_seed')}[/b] to change[/dim]"
         )
         words_locked = bool(self._seed_theme().patterns)
         mut_label = self.query_one("#mutation-label", Static)
@@ -829,7 +723,7 @@ class CodenameApp(App[None]):
         table = self.query_one("#suggestions", DataTable)
         table.clear()
         if not self.suggestions:
-            table.add_row("", "(no seed yet - press i)", "", "", "")
+            table.add_row("", f"(no seed yet - press {self._key_hint('edit_seed')})", "", "", "")
         else:
             for i, s in enumerate(self.suggestions, 1):
                 table.add_row(
@@ -1324,8 +1218,102 @@ class CodenameApp(App[None]):
         else:
             self._update_info()
 
-    def action_about(self) -> None:
-        self.push_screen(AboutScreen())
+    @property
+    def vim_navigation(self) -> bool:
+        """Ob die Vim-Navigation in der Vorschlagstabelle aktiv ist."""
+        return self._vim_navigation
+
+    def _apply_keymap(self, settings: dict[str, object]) -> None:
+        """Bindet die Tasten der aktiven Belegung (Stil, Vim, eigene Belegungen).
+
+        Class-level BINDINGS scheiden aus: der Stil steht erst fest, wenn die
+        Einstellungen geladen sind. Welche Taste welche Aktion ausloest, steht
+        in `codename_generator.keymap`, die Mechanik in `textual_widgets.keymap`.
+        """
+        resolved = keymap.resolve(settings)
+        self._keymap_problems = resolved.problems
+        self._keymap = dict(resolved.bindings)
+        for action, binding in resolved.bindings.items():
+            self._bindings.bind(
+                ",".join(binding.keys),
+                action,
+                keymap.LABELS.get(action, action),
+                key_display=keymap.key_display(binding.keys[0]),
+                show=binding.show,
+                priority=binding.priority,
+            )
+        # BindingsMap.bind() kennt kein tooltip - nachtraeglich per replace.
+        for key, bindings in self._bindings.key_to_bindings.items():
+            for index, bound in enumerate(bindings):
+                tooltip = keymap.TOOLTIPS.get(bound.action)
+                if tooltip:
+                    self._bindings.key_to_bindings[key][index] = dataclasses.replace(
+                        bound, tooltip=tooltip
+                    )
+
+    def _key_hint(self, action: str) -> str:
+        """Die Taste einer Aktion, so wie sie in einer Meldung stehen soll.
+
+        Meldungen duerfen keine Taste fest eingebaut haben - sie haengt am Stil
+        und an den eigenen Belegungen. Leer, wenn die Aktion keine Taste hat.
+        """
+        binding = self._keymap.get(action)
+        return keymap.key_display(binding.keys[0]) if binding else ""
+
+    def _log_keymap_problems(self) -> None:
+        """Meldet, was beim Zusammenbau der Tastenbelegung auffiel.
+
+        Etwa eine eigene Belegung mit unbekannter Aktion, oder eine Taste, die
+        die Vim-Navigation verdeckt - beides waere sonst unsichtbar.
+        """
+        for problem in self._keymap_problems:
+            self._log_event(f"[yellow]keys:[/yellow] {escape(problem.message)}")
+
+    def action_show_about(self) -> None:
+        self.push_screen(
+            AboutScreen(
+                app_name="codename-generator",
+                version=__version__,
+                author=__author__,
+                release=__year__,
+                description=(
+                    "Project codenames from curated themes,\nyour own word and phonetic mutations"
+                ),
+                license="Apache-2.0",
+                lang="en",
+                url="https://github.com/michaelblaess/codename-generator",
+            )
+        )
+
+    def action_keymap_overview(self) -> None:
+        """Zeigt die geltende Belegung - aus derselben Aufloesung wie die Bindung."""
+        settings = self._settings_store.load()
+        self.push_screen(
+            KeymapScreen(
+                keymap.resolve(settings),
+                keymap.style_from_settings(settings),
+                self.vim_navigation,
+            )
+        )
+
+    def action_show_settings(self) -> None:
+        self.push_screen(
+            CodenameSettingsScreen(self._settings_store.load(), lang="en"),
+            callback=self._on_settings_closed,
+        )
+
+    def _on_settings_closed(self, result: dict[str, object] | None) -> None:
+        """Uebernimmt den Dialog per vollem Merge - kein Feld kann durchrutschen."""
+        if result is None:
+            return
+        before = self._settings_store.load()
+        data = dict(before)
+        data.update(result)
+        self._settings_store.save(data)
+        changed = any(before.get(key) != data.get(key) for key in ("keymap_style", "keymap_vim"))
+        if changed:
+            self._log_event("keyboard settings saved - they apply after a restart")
+            self.notify("Keyboard settings saved - they apply after a restart")
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         """Blendet Aktionen im Footer aus, wenn sie im aktuellen Modus keinen Sinn ergeben."""

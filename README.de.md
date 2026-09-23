@@ -65,18 +65,20 @@ run.bat          # Windows
 uv run codename  # jede Plattform
 ```
 
-Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `i` eigenes Wort · `w` Wort halten · `k` Zusatz halten · `+` eigene Idee · `l` Sprache · `a` Info · `q` beenden
+Tasten: `r` neu generieren · `n` Name kopieren · `f` Favorit · `+` eigene Idee · `o` eigenes Wort · `w` Wort halten · `m` Zusatz halten · `l` Sprache · `s` Einstellungen · `i` Info · `q` beenden. Ohne Eintrag in der Fußzeile: `c` Slug kopieren, `v` Favoriten, `u` Mutation +25%, `t` Farbthema, `?` alle Tasten.
 
-**Eigenes Wort** (`i`, Eintrag *Custom Seed*): Dein Wort wird mit Adjektiven und Verben
+Die Belegung folgt der gemeinsamen Konvention aller meiner TUIs ([SHORTCUTS.md](https://github.com/michaelblaess/textual-widgets/blob/main/SHORTCUTS.md)). Unter `s` -> *Keyboard* lässt sie sich auf F-Tasten umstellen (F1 Info, F2 Einstellungen, F5 neu generieren, F7 eigenes Wort, F8 Wort halten, F9 Zusatz halten, F10 Sprache - die Buchstaben bleiben daneben), dazu gibt es eine Vim-Navigation für die Tabelle. Eigene Belegungen stehen in `settings.json` unter `keymap_custom`, `?` zeigt, was gerade gilt.
+
+**Eigenes Wort** (`o`, Eintrag *Custom Seed*): Dein Wort wird mit Adjektiven und Verben
 kombiniert oder, über *Seed partner* im Einstellungspanel, mit den Wörtern eines
 Themas (`Sitemap Orion`, `Pegasus Sitemap`). *Seed position* legt fest, ob dein Wort
 vorn oder hinten steht. Mit einem Partner-Thema mutiert nur dessen Wort, deins bleibt
 unverändert. Eine feste Position oder ein Partner-Thema legen zwei Wörter fest.
 
 **Variieren:** `w` hält das Wort des markierten Treffers und würfelt neue Zusätze
-(`Starke Viper` -> `Viper Wächter`), `k` hält den Zusatz und wechselt das Wort
+(`Starke Viper` -> `Viper Wächter`), `m` hält den Zusatz und wechselt das Wort
 (`Starke Viper` -> `Starker Aal`, `Starkes Murmeltier`, richtig gebeugt). Aus einer Variante
-heraus geht es mit `w`/`k` weiter, `r` würfelt neu, ein Eintrag in der Themenliste führt
+heraus geht es mit `w`/`m` weiter, `r` würfelt neu, ein Eintrag in der Themenliste führt
 zurück.
 
 Das linke Einstellungspanel hat drei Schieberegler - **Mutationswahrscheinlichkeit**

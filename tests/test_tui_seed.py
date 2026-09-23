@@ -105,7 +105,7 @@ def test_vary_keeps_word_then_modifier(isolated_settings: Path) -> None:
 
             # Von der ersten Variante aus: Zusatz halten, Tier wechselt.
             variant = app._recipes["__variant__"][0]
-            await pilot.press("k")
+            await pilot.press("m")
             await pilot.pause()
             recipes = app._recipes["__variant__"]
             assert all(r.adjective == variant.adjective for r in recipes)
