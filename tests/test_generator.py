@@ -8,6 +8,8 @@ from codename_generator.generator import (
     AnchorPosition,
     Generator,
     Pattern,
+    Recipe,
+    VariantKeep,
 )
 from codename_generator.wordlist import WordList
 
@@ -338,3 +340,77 @@ def test_seeded_position_puts_word_where_asked(language: str) -> None:
                 assert name.startswith("Sitemap "), name
             else:
                 assert name.endswith(" Sitemap"), name
+
+
+def _base(gen: Generator, slug: str, language: str) -> Recipe:
+    return gen.generate_recipes(slug, count=1, language=language)[0]
+
+
+@pytest.mark.parametrize("language", ["en", "de"])
+@pytest.mark.parametrize("word_count", [2, 3])
+def test_variant_keep_word(language: str, word_count: int) -> None:
+    """Wort halten: jedes Ergebnis traegt das Theme-Wort, keins gleicht dem Ausgang."""
+    slug = "animals" if language == "en" else "tierwelt"
+    for seed_value in range(10):
+        gen = Generator.load(seed=seed_value)
+        theme = gen.themes[slug]
+        base = _base(gen, slug, language)
+        original = gen.render(base, theme, word_count, 0.0, language).name
+        recipes = gen.generate_variant_recipes(base, theme, VariantKeep.WORD, 30, language)
+        names = [gen.render(r, theme, word_count, 0.0, language).name for r in recipes]
+        assert len(names) == 30
+        assert len(set(names)) == 30
+        assert original not in names
+        assert all(r.theme_word == base.theme_word for r in recipes)
+
+
+def test_variant_keep_modifier_inflects_per_gender() -> None:
+    """Zusatz halten auf Deutsch: derselbe Zusatz, gebeugt nach dem neuen Wort."""
+    gen = Generator.load(seed=2)
+    theme = gen.themes["tierwelt"]
+    base = Recipe(
+        theme_word="Falke",
+        adjective="still",
+        verb="jagend",
+        agent="",
+        pattern_index=0,
+        mutation_roll=1.0,
+        mutation_seed=0,
+    )
+    assert gen.render(base, theme, 2, 0.0, "de").name == "Stiller Falke"
+    recipes = gen.generate_variant_recipes(base, theme, VariantKeep.MODIFIER, 40, "de")
+    suggestions = [gen.render(r, theme, 2, 0.0, "de") for r in recipes]
+    assert len(suggestions) == 40
+    assert "Falke" not in [r.theme_word for r in recipes]
+    for s, r in zip(suggestions, recipes, strict=True):
+        ending = {"m": "Stiller", "f": "Stille", "n": "Stilles", "p": "Stille", "": "Stiller"}
+        assert s.name == f"{ending[theme.gender_of(r.theme_word)]} {r.theme_word}", s.name
+
+
+def test_variant_keep_modifier_keeps_anchor() -> None:
+    """Zusatz halten bei einem Anker-Treffer: das eigene Wort bleibt, der Partner wechselt."""
+    gen = Generator.load(seed=5)
+    partner = gen.themes["greek-gods"]
+    theme = gen.anchored_theme("Sitemap", partner, "en", AnchorPosition.FRONT)
+    base = gen.generate_anchored_recipes("Sitemap", partner, 1, AnchorPosition.FRONT)[0]
+    recipes = gen.generate_variant_recipes(base, theme, VariantKeep.MODIFIER, 20, "en")
+    names = [gen.render(r, theme, 2, 0.0, "en").name for r in recipes]
+    assert len(set(names)) == 20
+    assert all(n.startswith("Sitemap ") for n in names)
+
+
+def test_variant_on_single_word_theme_is_empty() -> None:
+    """Power words kennen nur ein Wort pro Name - Wort halten hat nichts zu variieren."""
+    gen = Generator.load(seed=1)
+    theme = gen.themes["power-words"]
+    base = _base(gen, "power-words", "en")
+    assert gen.generate_variant_recipes(base, theme, VariantKeep.WORD, 20, "en") == []
+
+
+def test_variant_keep_word_on_anchor_is_empty() -> None:
+    """Wort halten bei "Sitemap Selene" wuerde den Anker verlieren - dann lieber nichts."""
+    gen = Generator.load(seed=5)
+    partner = gen.themes["greek-gods"]
+    theme = gen.anchored_theme("Sitemap", partner, "en")
+    base = gen.generate_anchored_recipes("Sitemap", partner, 1)[0]
+    assert gen.generate_variant_recipes(base, theme, VariantKeep.WORD, 20, "en") == []

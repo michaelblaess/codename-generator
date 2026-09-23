@@ -41,6 +41,7 @@ from codename_generator.generator import (
     Pattern,
     Recipe,
     Suggestion,
+    VariantKeep,
 )
 from codename_generator.settings import JsonSettingsStore
 from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE, WordList
@@ -48,6 +49,9 @@ from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE, Word
 # Auswahlwert "kein Partner-Thema" - der Custom Seed zieht dann Adjektive und
 # Verben. Ein leerer String taugt nicht, Select behandelt ihn wie "nichts".
 SEED_PARTNER_MODIFIERS = "__modifiers__"
+
+# Recipe-Cache-Schluessel der Variantenansicht - kein Theme-Slug kann so heissen.
+VARIANT_KEY = "__variant__"
 
 SEED_POSITION_LABELS: dict[AnchorPosition, str] = {
     AnchorPosition.ANY: "Anywhere",
@@ -330,6 +334,8 @@ class CodenameApp(App[None]):
         Binding("f,F", "toggle_favorite", "Fav", key_display="f"),
         Binding("v,V", "open_favorites", "View favs", key_display="v"),
         Binding("i,I", "edit_seed", "Idea seed", key_display="i"),
+        Binding("w,W", "vary_word", "Keep word", key_display="w"),
+        Binding("k,K", "vary_modifier", "Keep mod", key_display="k"),
         Binding("l,L", "cycle_language", "Language", key_display="l"),
         Binding("plus", "add_custom_favorite", "Add idea", key_display="+"),
         Binding("a,A", "about", "About", key_display="a"),
@@ -363,6 +369,12 @@ class CodenameApp(App[None]):
         self._favorites_mode = False
         # Custom-Seed-Ansicht: rechts Varianten eines vom User eingegebenen Worts.
         self._seed_mode = False
+        # Variantenansicht: ein Treffer, bei dem Wort oder Zusatz stehen bleibt.
+        self._variant_mode = False
+        self._variant_theme: WordList | None = None
+        self._variant_base: Recipe | None = None
+        self._variant_keep = VariantKeep.WORD
+        self._variant_name = ""
 
         settings = self._settings_store.load()
         self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
@@ -610,12 +622,19 @@ class CodenameApp(App[None]):
         if self._seed_mode:
             self._update_seed_info()
             return
-        theme = self.generator.themes[self.theme_slug]
+        theme = self._current_theme()
         info = self.query_one("#info", Static)
-        info.update(
-            f"[b]{theme.name}[/b]  [dim]{theme.description}[/dim]   "
-            f"favorites: [b]{len(self.favorites)}[/b]"
-        )
+        if self._variant_mode:
+            kept = "word" if self._variant_keep == VariantKeep.WORD else "modifier"
+            info.update(
+                f'[b]Variants[/b]  [dim]of "{self._variant_name}", {kept} kept - '
+                "[b]w[/b]/[b]k[/b] vary again, [b]r[/b] reroll, pick a theme to leave[/dim]"
+            )
+        else:
+            info.update(
+                f"[b]{theme.name}[/b]  [dim]{theme.description}[/dim]   "
+                f"favorites: [b]{len(self.favorites)}[/b]"
+            )
 
         # Themes mit eigenen Patterns / mutate=false machen die Slider wirkungslos.
         mutation_locked = not theme.mutate
@@ -752,6 +771,9 @@ class CodenameApp(App[None]):
 
     def _fresh_recipes(self) -> None:
         """Verwirft die Recipes des aktuellen Themes/Seeds und erzeugt neue."""
+        if self._variant_mode:
+            self._reroll_variants()
+            return
         if self._seed_mode and self._custom_seed:
             self._recipes[CUSTOM_SEED_SLUG] = self._seed_recipes()
             return
@@ -774,9 +796,9 @@ class CodenameApp(App[None]):
             return
         if not self.theme_slug:
             return
-        theme = self.generator.themes[self.theme_slug]
+        theme = self._current_theme()
         mutation = self.mutation_percent / 100.0
-        recipes = self._recipes.get(self.theme_slug, [])
+        recipes = self._recipes.get(VARIANT_KEY if self._variant_mode else self.theme_slug, [])
         self.suggestions = [
             self.generator.render(r, theme, self.word_count, mutation, self.content_language)
             for r in recipes
@@ -838,6 +860,71 @@ class CodenameApp(App[None]):
                 )
         self._update_info()
 
+    def _current_theme(self) -> WordList:
+        """Das Theme der rechten Liste - in der Variantenansicht das des Ausgangstreffers."""
+        if self._variant_mode and self._variant_theme is not None:
+            return self._variant_theme
+        return self.generator.themes[self.theme_slug]
+
+    def action_vary_word(self) -> None:
+        self._vary(VariantKeep.WORD)
+
+    def action_vary_modifier(self) -> None:
+        self._vary(VariantKeep.MODIFIER)
+
+    def _vary(self, keep: VariantKeep) -> None:
+        """Varianten des markierten Treffers: Wort oder Zusatz bleibt, der Rest wechselt.
+
+        Geht aus einem Theme, aus dem Custom Seed und aus einer Variante heraus -
+        so tastet man sich Schritt fuer Schritt an einen Namen heran. Favoriten
+        tragen kein Recipe mehr und bleiben aussen vor.
+        """
+        if self._favorites_mode:
+            self.notify("Favorites can't be varied - pick a theme", severity="warning")
+            return
+        if self._seed_mode:
+            key, theme = CUSTOM_SEED_SLUG, self._seed_theme()
+        elif self._variant_mode and self._variant_theme is not None:
+            key, theme = VARIANT_KEY, self._variant_theme
+        else:
+            key, theme = self.theme_slug, self.generator.themes[self.theme_slug]
+        recipes = self._recipes.get(key, [])
+        row = self.query_one("#suggestions", DataTable).cursor_row
+        if not 0 <= row < len(recipes):
+            return
+        base = recipes[row]
+        variants = self.generator.generate_variant_recipes(
+            base, theme, keep, count=self.suggestion_count, language=self.content_language
+        )
+        if not variants:
+            self.notify("Nothing to vary here", severity="warning")
+            return
+        name = self.suggestions[row].name if row < len(self.suggestions) else base.theme_word
+        self._seed_mode = False
+        self._variant_mode = True
+        self._variant_theme = theme
+        self._variant_base = base
+        self._variant_keep = keep
+        self._variant_name = name
+        self._recipes[VARIANT_KEY] = variants
+        self.sub_title = f"variants of {name}"
+        self._log_event(f"vary [b]{name}[/b], keep {keep.value}")
+        self._rerender()
+        self.query_one("#suggestions", DataTable).move_cursor(row=0)
+
+    def _reroll_variants(self) -> None:
+        """Neue Varianten vom selben Ausgangstreffer (Taste r, neue Vorschlagsanzahl)."""
+        if self._variant_base is None or self._variant_theme is None:
+            self._variant_mode = False
+            return
+        self._recipes[VARIANT_KEY] = self.generator.generate_variant_recipes(
+            self._variant_base,
+            self._variant_theme,
+            self._variant_keep,
+            count=self.suggestion_count,
+            language=self.content_language,
+        )
+
     def _selected_suggestion(self) -> Suggestion | None:
         table = self.query_one("#suggestions", DataTable)
         if table.row_count == 0:
@@ -865,6 +952,7 @@ class CodenameApp(App[None]):
             if not self._favorites_mode:
                 self._favorites_mode = True
                 self._seed_mode = False
+                self._variant_mode = False
                 self.sub_title = "favorites"
                 self._log_event("viewing [b]favorites[/b]")
                 self._rerender()
@@ -878,9 +966,10 @@ class CodenameApp(App[None]):
         slug = item_id[len("theme-") :]
         if slug not in self.generator.themes:
             return
-        was_special = self._favorites_mode or self._seed_mode
+        was_special = self._favorites_mode or self._seed_mode or self._variant_mode
         self._favorites_mode = False
         self._seed_mode = False
+        self._variant_mode = False
         if slug == self.theme_slug:
             # Gleiche Theme - nur noetig, wenn wir aus einer Sonderansicht kommen.
             if was_special:
@@ -907,6 +996,7 @@ class CodenameApp(App[None]):
             if allow_dialog:
                 self.action_edit_seed()
             return
+        self._variant_mode = False
         if not self._seed_mode:
             self._seed_mode = True
             self.sub_title = f"seed: {self._custom_seed}"
@@ -1047,6 +1137,8 @@ class CodenameApp(App[None]):
             self._recipes.clear()
             self._ensure_recipes()
             self._ensure_seed_recipes()
+            if self._variant_mode:
+                self._reroll_variants()
         else:
             return
         self._save_settings()
@@ -1095,7 +1187,11 @@ class CodenameApp(App[None]):
         # erneutes Changed-Event laeuft oben in den Frueh-Return.
         self.query_one("#language-select", Select).value = language
         # Die Recipes tragen die Modifier der alten Sprache - alle verwerfen.
+        # Varianten haengen an einem Treffer der alten Sprache, sie enden hier.
         self._recipes.clear()
+        if self._variant_mode:
+            self._variant_mode = False
+            self.sub_title = self.theme_slug
         visible = self._visible_theme_slugs()
         if not visible:
             return

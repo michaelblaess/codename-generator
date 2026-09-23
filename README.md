@@ -65,13 +65,18 @@ run.bat          # Windows
 uv run codename  # any platform
 ```
 
-Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `i` your own word · `+` your own idea · `l` language · `a` about · `q` quit
+Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `i` your own word · `w` keep word · `k` keep modifier · `+` your own idea · `l` language · `a` about · `q` quit
 
 **Your own word** (`i`, entry *Custom Seed*): your word is combined with adjectives and
 verbs or, via *Seed partner* in the settings panel, with the words of a theme
 (`Sitemap Orion`, `Pegasus Sitemap`). *Seed position* decides whether your word stands
 in front or at the back. With a partner theme only the partner's word mutates, yours
 stays as typed. A fixed position or a partner theme sets the name to two words.
+
+**Varying:** `w` keeps the word of the highlighted suggestion and rolls new modifiers
+(`Silent Falcon` -> `Falcon Runner`), `k` keeps the modifier and swaps the word
+(`Silent Falcon` -> `Silent Otter`, `Silent Lynx`; German inflects it per gender). From a
+variant, `w`/`k` go on from there, `r` rerolls, picking a theme in the list goes back.
 
 The left settings panel has three sliders - **mutation chance** (0-100%),
 **word count** (1, 2 or 3 visible words per name) and **suggestions**

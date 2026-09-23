@@ -40,6 +40,15 @@ class Pattern(StrEnum):
     THEME_ANCHOR = "theme-anchor"
 
 
+class VariantKeep(StrEnum):
+    """Was beim Variieren eines Treffers stehen bleibt."""
+
+    # Das Theme-Wort bleibt, Zusaetze und Pattern werden neu gewuerfelt.
+    WORD = "word"
+    # Zusaetze und Pattern bleiben, das Theme-Wort wechselt.
+    MODIFIER = "modifier"
+
+
 class AnchorPosition(StrEnum):
     """Wo das eigene Wort im Namen steht."""
 
@@ -330,18 +339,45 @@ class Generator:
         der uebergebenen Sprache. `position` muss dieselbe sein wie beim
         passenden `seeded_theme`, sonst zeigen Index und Pattern auseinander.
         """
-        adjectives = self._modifier_pool(language, "adjectives")
-        verbs = self._modifier_pool(language, "verbs")
-        agents = self._modifier_pool(language, "agents")
+        return self._modifier_recipes(
+            seed,
+            count,
+            anchor_modifier_patterns(language, position),
+            self._modifier_pool(language, "adjectives"),
+            self._modifier_pool(language, "verbs"),
+            self._modifier_pool(language, "agents"),
+        )
+
+    def _modifier_recipes(
+        self,
+        theme_word: str,
+        count: int,
+        two_word_patterns: tuple[Pattern, ...],
+        adjectives: tuple[str, ...],
+        verbs: tuple[str, ...],
+        agents: tuple[str, ...],
+        exclude: Recipe | None = None,
+    ) -> list[Recipe]:
+        """Recipes mit festem Theme-Wort und wechselnden Zusaetzen, ohne sichtbare Dublette.
+
+        `two_word_patterns` ist die Liste, in die `pattern_index` zeigt - dieselbe,
+        die `_select_pattern` spaeter benutzt. `exclude` ist ein Recipe, dessen
+        sichtbarer Name nicht noch einmal vorkommen soll (der Treffer, von dem
+        aus variiert wird). Die Zugfolge des Zufalls ist die alte aus
+        `generate_seeded_recipes` - daran haengen die Permalinks im Web.
+        """
         recipes: list[Recipe] = []
         seen_two: set[tuple[str, str]] = set()
         seen_three: set[tuple[str, str]] = set()
+        pattern_choices = len(two_word_patterns)
+        if exclude is not None:
+            excluded = two_word_patterns[exclude.pattern_index % pattern_choices]
+            seen_two.add(
+                _visible_modifier(excluded, exclude.adjective, exclude.verb, exclude.agent)
+            )
+            seen_three.add((exclude.adjective.lower(), exclude.verb.lower()))
         attempts = 0
         max_attempts = count * 40
-        # Anzahl der Patterns, aus denen gezogen wird - korrespondiert mit
-        # _two_word_patterns in _select_pattern.
-        two_word_patterns = anchor_modifier_patterns(language, position)
-        pattern_choices = len(two_word_patterns)
         while len(recipes) < count and attempts < max_attempts:
             attempts += 1
             adjective = self.rng.choice(adjectives)
@@ -357,7 +393,7 @@ class Generator:
             seen_three.add(key_three)
             recipes.append(
                 Recipe(
-                    theme_word=seed,
+                    theme_word=theme_word,
                     adjective=adjective,
                     verb=verb,
                     agent=agent,
@@ -495,6 +531,73 @@ class Generator:
                     pattern_index=self.rng.randrange(pattern_choices),
                     mutation_roll=self.rng.random(),
                     mutation_seed=self.rng.randrange(_SEED_CEILING),
+                )
+            )
+        return recipes
+
+    def generate_variant_recipes(
+        self,
+        base: Recipe,
+        theme: WordList,
+        keep: VariantKeep,
+        count: int = 30,
+        language: str | None = None,
+    ) -> list[Recipe]:
+        """Varianten eines Treffers: ein Teil bleibt stehen, der andere wird neu gewuerfelt.
+
+        WORD haelt das Theme-Wort und zieht neue Zusaetze aus denselben Pools
+        wie `generate_recipes` - das Genus kommt weiter aus dem Theme, die
+        Beugung stimmt also. MODIFIER haelt Adjektiv, Verb, Agent, Anker und
+        Pattern und zieht neue Theme-Woerter. Der Ausgangstreffer selbst kommt
+        in beiden Faellen nicht noch einmal vor.
+        """
+        if keep == VariantKeep.MODIFIER:
+            return self._variant_theme_words(base, theme, count)
+        # Bei einem Anker-Treffer ("Sitemap Selene") wuerden neue Zusaetze den
+        # Anker verdraengen - dort gibt es nur "Zusatz halten".
+        if base.anchor:
+            return []
+        lang = effective_language(theme, language)
+        declared = _patterns_from_strings(theme.patterns)
+        # Ein Theme, das nur einzelne Woerter kennt (Power words), hat nichts
+        # zum Variieren - jeder Name waere wieder dasselbe Wort.
+        if declared and all(PATTERN_WORD_COUNT[p] <= 1 for p in declared):
+            return []
+        return self._modifier_recipes(
+            base.theme_word,
+            count,
+            declared or _two_word_patterns(lang),
+            theme.adjectives or self._modifier_pool(lang, "adjectives"),
+            theme.verbs or self._modifier_pool(lang, "verbs"),
+            self._modifier_pool(lang, "agents"),
+            exclude=base,
+        )
+
+    def _variant_theme_words(self, base: Recipe, theme: WordList, count: int) -> list[Recipe]:
+        """Recipes mit den Zusaetzen von `base` und anderen Woertern aus `theme`."""
+        candidates = [w for w in theme.words if w.casefold() != base.theme_word.casefold()]
+        if base.anchor:
+            candidates = [w for w in candidates if w.casefold() != base.anchor.casefold()]
+        recipes: list[Recipe] = []
+        seen: set[str] = set()
+        attempts = 0
+        max_attempts = count * 40
+        while candidates and len(recipes) < count and attempts < max_attempts:
+            attempts += 1
+            word = self.rng.choice(candidates)
+            if word.casefold() in seen:
+                continue
+            seen.add(word.casefold())
+            recipes.append(
+                Recipe(
+                    theme_word=word,
+                    adjective=base.adjective,
+                    verb=base.verb,
+                    agent=base.agent,
+                    pattern_index=base.pattern_index,
+                    mutation_roll=self.rng.random(),
+                    mutation_seed=self.rng.randrange(_SEED_CEILING),
+                    anchor=base.anchor,
                 )
             )
         return recipes

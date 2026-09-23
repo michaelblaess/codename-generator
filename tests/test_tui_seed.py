@@ -81,3 +81,40 @@ def test_seed_settings_survive_restart(isolated_settings: Path) -> None:
             assert all(s.name.endswith(" Sitemap") for s in app.suggestions)
 
     asyncio.run(run())
+
+
+def test_vary_keeps_word_then_modifier(isolated_settings: Path) -> None:
+    """w haelt das Wort, k danach den Zusatz - Schritt fuer Schritt an einen Namen heran."""
+
+    async def run() -> None:
+        app = CodenameApp()
+        async with app.run_test(size=(140, 45)) as pilot:
+            app.mutation_percent = 0
+            app.word_count = 2
+            app._switch_theme("theme-animals")
+            await pilot.pause()
+            base = app._recipes["animals"][0]
+            first = app.suggestions[0].name
+
+            await pilot.press("w")
+            await pilot.pause()
+            assert app._variant_mode
+            names = [s.name for s in app.suggestions]
+            assert first not in names
+            assert all(base.theme_word in n for n in names), names
+
+            # Von der ersten Variante aus: Zusatz halten, Tier wechselt.
+            variant = app._recipes["__variant__"][0]
+            await pilot.press("k")
+            await pilot.pause()
+            recipes = app._recipes["__variant__"]
+            assert all(r.adjective == variant.adjective for r in recipes)
+            assert all(r.theme_word != variant.theme_word for r in recipes)
+
+            # Ein Theme in der Liste verlaesst die Variantenansicht.
+            app._switch_theme("theme-animals")
+            await pilot.pause()
+            assert not app._variant_mode
+            assert app.suggestions[0].name == first
+
+    asyncio.run(run())

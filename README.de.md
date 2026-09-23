@@ -65,13 +65,19 @@ run.bat          # Windows
 uv run codename  # jede Plattform
 ```
 
-Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `i` eigenes Wort · `+` eigene Idee · `l` Sprache · `a` Info · `q` beenden
+Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `i` eigenes Wort · `w` Wort halten · `k` Zusatz halten · `+` eigene Idee · `l` Sprache · `a` Info · `q` beenden
 
 **Eigenes Wort** (`i`, Eintrag *Custom Seed*): Dein Wort wird mit Adjektiven und Verben
 kombiniert oder, über *Seed partner* im Einstellungspanel, mit den Wörtern eines
 Themas (`Sitemap Orion`, `Pegasus Sitemap`). *Seed position* legt fest, ob dein Wort
 vorn oder hinten steht. Mit einem Partner-Thema mutiert nur dessen Wort, deins bleibt
 unverändert. Eine feste Position oder ein Partner-Thema legen zwei Wörter fest.
+
+**Variieren:** `w` hält das Wort des markierten Treffers und würfelt neue Zusätze
+(`Starke Viper` -> `Viper Wächter`), `k` hält den Zusatz und wechselt das Wort
+(`Starke Viper` -> `Starker Aal`, `Starkes Murmeltier`, richtig gebeugt). Aus einer Variante
+heraus geht es mit `w`/`k` weiter, `r` würfelt neu, ein Eintrag in der Themenliste führt
+zurück.
 
 Das linke Einstellungspanel hat drei Schieberegler - **Mutationswahrscheinlichkeit**
 (0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Wörter pro Name) und
