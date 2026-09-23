@@ -15,7 +15,7 @@ from typing import Any, TypeVar
 
 import pytest
 
-from codename_generator.generator import Generator, Recipe, _slugify
+from codename_generator.generator import Generator, Pattern, Recipe, Suggestion, _slugify
 from codename_generator.grammar import inflect_attribute
 from codename_generator.phonetic import mutate
 from codename_generator.wordlist import WordList
@@ -120,3 +120,19 @@ def test_render(case: dict[str, Any]) -> None:
     assert suggestion.pattern.value == expected["pattern"]
     assert list(suggestion.source_words) == expected["sources"]
     assert suggestion.mutated is False
+
+
+@pytest.mark.parametrize("case", _VECTORS["favorite"], ids=_ids(_VECTORS["favorite"], "_note"))
+def test_favorite(case: dict[str, Any]) -> None:
+    generator = Generator(themes={}, modifiers={}, rng=random.Random(0))
+    stored = Suggestion(
+        name="",
+        slug="stored",
+        pattern=Pattern(case["pattern"]),
+        mutated=False,
+        source_words=tuple(case["sources"]),
+    )
+    rendered = generator.render_favorite(stored, mutation_chance=0.0)
+    assert rendered.name == case["expected"]["name"]
+    assert rendered.slug == case["expected"]["slug"]
+    assert rendered.mutated is False

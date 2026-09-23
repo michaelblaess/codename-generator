@@ -4,7 +4,19 @@
     "Beide Suiten laufen gegen genau diese Datei (Web: per npm run daten kopiert).",
     "Nur deterministische Teile. Die Zufallsgeneratoren unterscheiden sich bewusst.",
     "mutate.script: Folge von Indizes fuer einen geskripteten Zufall.",
-    "choice(items) nimmt items[i % len], sample(items, k) nimmt k-mal pool.pop(i % len(pool))."
+    "choice(items) nimmt items[i % len], sample(items, k) nimmt k-mal pool.pop(i % len(pool)).",
+    "favorite: gespeicherter Eintrag (pattern, sources) bei Mutation 0 neu gerendert."
+  ],
+  "favorite": [
+    { "_note": "Adjektiv vorn", "pattern": "adj-theme", "sources": ["Falcon", "silent"], "expected": { "name": "Silent Falcon", "slug": "silent-falcon" } },
+    { "_note": "Verb hinten", "pattern": "theme-verb", "sources": ["Falcon", "hunting"], "expected": { "name": "Falcon Hunting", "slug": "falcon-hunting" } },
+    { "_note": "Agent mit Umlaut", "pattern": "theme-agent", "sources": ["Falke", "läufer"], "expected": { "name": "Falke Läufer", "slug": "falke-laeufer" } },
+    { "_note": "Drei Woerter englisch", "pattern": "adj-theme-verb", "sources": ["Falcon", "silent", "hunting"], "expected": { "name": "Silent Falcon Hunting", "slug": "silent-falcon-hunting" } },
+    { "_note": "Drei Woerter deutsch, schon gebeugt", "pattern": "adj-verb-theme", "sources": ["Wiesel", "dunkles", "lauerndes"], "expected": { "name": "Dunkles Lauerndes Wiesel", "slug": "dunkles-lauerndes-wiesel" } },
+    { "_note": "Eigene Idee bleibt ein Stueck", "pattern": "theme", "sources": ["Sitemap Pioneer"], "expected": { "name": "Sitemap Pioneer", "slug": "sitemap-pioneer" } },
+    { "_note": "Eigene Idee klein getippt", "pattern": "theme", "sources": ["sitemap pioneer"], "expected": { "name": "Sitemap Pioneer", "slug": "sitemap-pioneer" } },
+    { "_note": "Modifikator fehlt", "pattern": "adj-theme", "sources": ["Falcon"], "expected": { "name": "Falcon", "slug": "falcon" } },
+    { "_note": "Drei Woerter, nur ein Modifikator", "pattern": "adj-theme-verb", "sources": ["Falcon", "silent"], "expected": { "name": "Falcon", "slug": "falcon" } }
   ],
   "slugify": [
     { "input": "Grüner Blitz", "expected": "gruener-blitz" },

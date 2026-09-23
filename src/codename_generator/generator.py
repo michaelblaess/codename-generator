@@ -140,6 +140,21 @@ def _slugify(text: str) -> str:
     return _SLUG_RE.sub("-", ascii_only).strip("-")
 
 
+def _visible_modifier(pattern: Pattern, adjective: str, verb: str, agent: str) -> tuple[str, str]:
+    """Position und Modifier, die ein Zwei-Wort-Pattern tatsaechlich im Namen zeigt.
+
+    Die Position gehoert mit in den Schluessel, das Pattern nicht: manche Woerter
+    stehen in zwei Pools ("forge" ist Verb und Agent, "flackernd" Adjektiv und
+    Verb) und ergaeben sonst ueber zwei Patterns denselben Namen.
+    """
+    if pattern == Pattern.ADJ_THEME:
+        return ("prefix", adjective.lower())
+    if pattern == Pattern.VERB_THEME:
+        return ("prefix", verb.lower())
+    # THEME_VERB und THEME_AGENT haengen an, ohne Agent-Pool das Verb.
+    return ("suffix", agent.lower() if pattern == Pattern.THEME_AGENT and agent else verb.lower())
+
+
 def _compose_name(pattern: Pattern, theme_word: str, modifiers: tuple[str, ...]) -> str:
     """Setzt einen Namen aus Pattern, Theme-Wort und Modifiern zusammen."""
     mods = list(modifiers)
@@ -259,29 +274,38 @@ class Generator:
         Anders als `generate_recipes` ist das Theme-Wort vom Benutzer
         vorgegeben (z.B. "Sitemap") - nicht zufaellig aus einer Wortliste.
         Damit alle Vorschlaege trotz gleichen Theme-Worts unterschiedlich
-        sind, wird auf der Kombination (adjective, verb, agent, pattern_index)
-        dedupliziert. Modifier kommen aus den Pools der uebergebenen Sprache.
+        sind, wird auf dem dedupliziert, was im Namen tatsaechlich sichtbar
+        ist - bei zwei Woertern der eine Modifier des Patterns, bei drei
+        Woertern Adjektiv plus Verb. Die ganze Kombination als Schluessel
+        reichte nicht: zwei Recipes mit gleichem Adjektiv und verschiedenem
+        Verb ergaben zweimal "Silent Sitemap". Modifier kommen aus den Pools
+        der uebergebenen Sprache.
         """
         adjectives = self._modifier_pool(language, "adjectives")
         verbs = self._modifier_pool(language, "verbs")
         agents = self._modifier_pool(language, "agents")
         recipes: list[Recipe] = []
-        seen: set[tuple[str, str, str, int]] = set()
+        seen_two: set[tuple[str, str]] = set()
+        seen_three: set[tuple[str, str]] = set()
         attempts = 0
         max_attempts = count * 40
         # Anzahl der Patterns, aus denen gezogen wird - korrespondiert mit
         # _two_word_patterns in _select_pattern.
-        pattern_choices = len(_two_word_patterns(language))
+        two_word_patterns = _two_word_patterns(language)
+        pattern_choices = len(two_word_patterns)
         while len(recipes) < count and attempts < max_attempts:
             attempts += 1
             adjective = self.rng.choice(adjectives)
             verb = self.rng.choice(verbs)
             agent = self.rng.choice(agents) if agents else ""
             pattern_index = self.rng.randrange(pattern_choices)
-            key = (adjective.lower(), verb.lower(), agent.lower(), pattern_index)
-            if key in seen:
+            pattern = two_word_patterns[pattern_index]
+            key_two = _visible_modifier(pattern, adjective, verb, agent)
+            key_three = (adjective.lower(), verb.lower())
+            if key_two in seen_two or key_three in seen_three:
                 continue
-            seen.add(key)
+            seen_two.add(key_two)
+            seen_three.add(key_three)
             recipes.append(
                 Recipe(
                     theme_word=seed,

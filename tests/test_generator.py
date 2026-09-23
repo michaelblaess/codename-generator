@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
     PATTERN_WORD_COUNT,
@@ -210,12 +212,26 @@ def test_seeded_render_produces_varied_names() -> None:
     theme = gen.seeded_theme(seed)
     recipes = gen.generate_seeded_recipes(seed, count=20)
     suggestions = [gen.render(r, theme, word_count=2, mutation_chance=0.0) for r in recipes]
-    names = {s.name for s in suggestions}
-    # Bei word_count=2 muessen sich die Namen durch die Modifier unterscheiden.
-    assert len(names) >= 15, f"expected variety in seeded suggestions, got {len(names)}"
     # Der Seed kommt in jedem Namen vor (case-insensitive).
     for s in suggestions:
         assert seed.lower() in s.name.lower(), f"seed missing in name: {s.name}"
+
+
+@pytest.mark.parametrize("language", ["en", "de"])
+@pytest.mark.parametrize("word_count", [2, 3])
+def test_seeded_names_never_repeat(language: str, word_count: int) -> None:
+    """Ein voller Stapel (40) zu einem eigenen Wort hat keinen Namen doppelt.
+
+    Vorher wurde auf der ganzen Kombination dedupliziert, sichtbar ist aber nur
+    ein Teil davon - "Silent Sitemap" kam dann zweimal.
+    """
+    for seed_value in range(20):
+        gen = Generator.load(seed=seed_value)
+        theme = gen.seeded_theme("Sitemap", language)
+        recipes = gen.generate_seeded_recipes("Sitemap", count=40, language=language)
+        names = [gen.render(r, theme, word_count, 0.0, language).name for r in recipes]
+        assert len(recipes) == 40
+        assert len(set(names)) == len(names), f"seed {seed_value}: {sorted(names)}"
 
 
 def test_seeded_theme_has_seed_word() -> None:
