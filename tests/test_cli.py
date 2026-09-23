@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 from codename_generator.cli import DEFAULT_MUTATION_CHANCE, _mutation_chance
+from codename_generator.generator import Generator
 
 
 def test_explicit_value_wins() -> None:
@@ -43,3 +44,12 @@ def test_word_with_partner_theme_in_front() -> None:
     # Zeile: " 1. * Sitemap Alkaid   sitemap-alkaid" - Nummer und Mutationsstern ab.
     names = [line.split(".", 1)[1].lstrip(" *").split()[0] for line in out.splitlines() if line]
     assert names == ["Sitemap"] * 5, out
+
+
+def test_mix_kreuzt_zwei_themen() -> None:
+    out = _run_cli("-t", "whisky", "--mix", "constellations", "-n", "5", "--mutation-chance", "0")
+    zeilen = [line for line in out.splitlines() if line]
+    assert len(zeilen) == 5
+    sterne = Generator.load().themes["constellations"].words
+    # Ohne --mix kaemen reine Whisky-Namen - jede Zeile muss ein Sternbild tragen.
+    assert all(any(stern in line for stern in sterne) for line in zeilen), out

@@ -56,6 +56,9 @@ from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE, Word
 # Verben. Ein leerer String taugt nicht, Select behandelt ihn wie "nichts".
 SEED_PARTNER_MODIFIERS = "__modifiers__"
 
+# Auswahlwert "kein Mix" - das Theme steht fuer sich. Gleicher Grund wie oben.
+MIX_NONE = "__none__"
+
 # Recipe-Cache-Schluessel der Variantenansicht - kein Theme-Slug kann so heissen.
 VARIANT_KEY = "__variant__"
 
@@ -263,6 +266,9 @@ class CodenameApp(App[None]):
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._custom_seed = str(settings.get("custom_seed", "")).strip()
         # Partner des Custom Seed: leer = Adjektive und Verben, sonst ein Theme-Slug.
+        # Themen-Mix: leer = kein Mix, sonst der Slug des zweiten Themes.
+        mix = str(settings.get("mix_partner", ""))
+        self._mix_partner = mix if mix in self.generator.themes else ""
         partner = str(settings.get("seed_partner", ""))
         self._seed_partner = partner if partner in self.generator.themes else ""
         self._seed_position = self._coerce_position(settings.get("seed_position"))
@@ -380,6 +386,7 @@ class CodenameApp(App[None]):
                 "favorites": self._serialize_favorites(),
                 "custom_seed": self._custom_seed,
                 "seed_partner": self._seed_partner,
+                "mix_partner": self._mix_partner,
                 "seed_position": self._seed_position.value,
                 "language": self.content_language,
             }
@@ -458,6 +465,18 @@ class CodenameApp(App[None]):
                         allow_blank=False,
                         id="language-select",
                     )
+                    yield Static("Mix with", classes="settings-label")
+                    mix_select = Select(
+                        self._mix_options(),
+                        value=self._mix_partner or MIX_NONE,
+                        allow_blank=False,
+                        id="mix-select",
+                    )
+                    mix_select.tooltip = (
+                        "Cross the active theme with a second one: "
+                        "one word from each, e.g. Taurus Orion"
+                    )
+                    yield mix_select
                     yield Static("Seed partner", classes="settings-label")
                     yield Select(
                         self._partner_options(),
@@ -653,10 +672,8 @@ class CodenameApp(App[None]):
 
     def _ensure_recipes(self) -> None:
         """Erzeugt Recipes fuer das aktuelle Theme, falls noch keine im Cache."""
-        if self.theme_slug and self.theme_slug not in self._recipes:
-            self._recipes[self.theme_slug] = self.generator.generate_recipes(
-                self.theme_slug, count=self.suggestion_count, language=self.content_language
-            )
+        if self.theme_slug and self._theme_key() not in self._recipes:
+            self._recipes[self._theme_key()] = self._theme_recipes()
 
     def _ensure_seed_recipes(self) -> None:
         """Erzeugt Recipes fuer den aktuellen Custom-Seed, falls noch keine im Cache."""
@@ -672,9 +689,7 @@ class CodenameApp(App[None]):
             self._recipes[CUSTOM_SEED_SLUG] = self._seed_recipes()
             return
         if self.theme_slug:
-            self._recipes[self.theme_slug] = self.generator.generate_recipes(
-                self.theme_slug, count=self.suggestion_count, language=self.content_language
-            )
+            self._recipes[self._theme_key()] = self._theme_recipes()
 
     def _rerender(self) -> None:
         """Rendert die vorhandenen Recipes mit aktueller Mutation/Wortzahl neu.
@@ -692,7 +707,7 @@ class CodenameApp(App[None]):
             return
         theme = self._current_theme()
         mutation = self.mutation_percent / 100.0
-        recipes = self._recipes.get(VARIANT_KEY if self._variant_mode else self.theme_slug, [])
+        recipes = self._recipes.get(VARIANT_KEY if self._variant_mode else self._theme_key(), [])
         self.suggestions = [
             self.generator.render(r, theme, self.word_count, mutation, self.content_language)
             for r in recipes
@@ -758,7 +773,43 @@ class CodenameApp(App[None]):
         """Das Theme der rechten Liste - in der Variantenansicht das des Ausgangstreffers."""
         if self._variant_mode and self._variant_theme is not None:
             return self._variant_theme
-        return self.generator.themes[self.theme_slug]
+        return self._theme_view()
+
+    def _mix_active(self) -> bool:
+        """Ob die Themenansicht gerade zwei Themes kreuzt."""
+        return bool(self._mix_partner) and self._mix_partner != self.theme_slug
+
+    def _theme_key(self) -> str:
+        """Cache-Schluessel der Themenansicht - je Mix ein eigener Stapel."""
+        return f"{self.theme_slug}+{self._mix_partner}" if self._mix_active() else self.theme_slug
+
+    def _theme_view(self) -> WordList:
+        """Das Theme der Themenansicht: das gewaehlte, oder gekreuzt mit dem Mix-Partner."""
+        base = self.generator.themes[self.theme_slug]
+        if not self._mix_active():
+            return base
+        return self.generator.crossed_theme(
+            base, self.generator.themes[self._mix_partner], self.content_language
+        )
+
+    def _theme_recipes(self) -> list[Recipe]:
+        """Frische Recipes fuer die Themenansicht, mit oder ohne Mix."""
+        if self._mix_active():
+            return self.generator.generate_crossed_recipes(
+                self.generator.themes[self.theme_slug],
+                self.generator.themes[self._mix_partner],
+                count=self.suggestion_count,
+            )
+        return self.generator.generate_recipes(
+            self.theme_slug, count=self.suggestion_count, language=self.content_language
+        )
+
+    def _mix_options(self) -> list[tuple[str, str]]:
+        """Auswahl fuer den Mix: keiner oder ein sichtbares Theme."""
+        options = [("No mix", MIX_NONE)]
+        for slug in self._visible_theme_slugs():
+            options.append((self.generator.themes[slug].name, slug))
+        return options
 
     def action_vary_word(self) -> None:
         self._vary(VariantKeep.WORD)
@@ -781,7 +832,7 @@ class CodenameApp(App[None]):
         elif self._variant_mode and self._variant_theme is not None:
             key, theme = VARIANT_KEY, self._variant_theme
         else:
-            key, theme = self.theme_slug, self.generator.themes[self.theme_slug]
+            key, theme = self._theme_key(), self._theme_view()
         recipes = self._recipes.get(key, [])
         row = self.query_one("#suggestions", DataTable).cursor_row
         if not 0 <= row < len(recipes):
@@ -1049,8 +1100,22 @@ class CodenameApp(App[None]):
         """Auswahlfelder im Settings-Panel: Sprache, Partner und Position des Seeds."""
         if not isinstance(event.value, str):
             return
+        # set_options meldet einen Zwischenstand, der erst ankommt, wenn das Feld
+        # schon auf dem endgueltigen Wert steht - den nicht als Auswahl werten.
+        if str(event.value) != str(event.select.value):
+            return
         if event.select.id == "language-select":
             await self._apply_language(event.value)
+        elif event.select.id == "mix-select":
+            mix = "" if event.value == MIX_NONE else event.value
+            if mix == self._mix_partner or (mix and mix not in self.generator.themes):
+                return
+            self._mix_partner = mix
+            self._variant_mode = False
+            self._ensure_recipes()
+            self._log_event(f"mix -> [b]{mix or 'none'}[/b]")
+            self._save_settings()
+            self._rerender()
         elif event.select.id == "seed-partner-select":
             partner = "" if event.value == SEED_PARTNER_MODIFIERS else event.value
             if partner == self._seed_partner or (partner and partner not in self.generator.themes):
@@ -1115,6 +1180,12 @@ class CodenameApp(App[None]):
         partner_select = self.query_one("#seed-partner-select", Select)
         partner_select.set_options(self._partner_options())
         partner_select.value = self._seed_partner or SEED_PARTNER_MODIFIERS
+        # Dasselbe fuer den Mix-Partner.
+        if self._mix_partner and self._mix_partner not in visible:
+            self._mix_partner = ""
+        mix_select = self.query_one("#mix-select", Select)
+        mix_select.set_options(self._mix_options())
+        mix_select.value = self._mix_partner or MIX_NONE
         self._ensure_recipes()
         self._ensure_seed_recipes()
         self._log_event(f"language -> [b]{self.content_language}[/b]")

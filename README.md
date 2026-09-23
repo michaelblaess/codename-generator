@@ -75,6 +75,10 @@ verbs or, via *Seed partner* in the settings panel, with the words of a theme
 in front or at the back. With a partner theme only the partner's word mutates, yours
 stays as typed. A fixed position or a partner theme sets the name to two words.
 
+**Theme mix** (*Mix with* in the settings panel): the active theme is crossed with a
+second one, every name takes one word from each (`Snowdon Lepus`, `Fomalhaut
+Lhotse`). No word appears twice in a batch.
+
 **Varying:** `w` keeps the word of the highlighted suggestion and rolls new modifiers
 (`Silent Falcon` -> `Falcon Runner`), `m` keeps the modifier and swaps the word
 (`Silent Falcon` -> `Silent Otter`, `Silent Lynx`; German inflects it per gender). From a
@@ -109,6 +113,7 @@ uv run codename -t tierwelt -n 10       # German names, inflected
 uv run codename -t swatch --lang de      # proper names, German modifiers
 uv run codename -w Sitemap              # your own word with modifiers
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
+uv run codename -t whisky --mix constellations   # Snowdon Lepus ...
 ```
 
 A `*` next to a suggestion means a phonetic mutation was applied

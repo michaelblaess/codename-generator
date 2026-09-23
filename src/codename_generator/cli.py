@@ -45,6 +45,11 @@ def main() -> int:
         default=AnchorPosition.ANY.value,
         help="Where your --word stands in the name (default: any)",
     )
+    parser.add_argument(
+        "--mix",
+        default=None,
+        help="Cross --theme with a second theme: one word from each (e.g. Taurus Orion)",
+    )
     parser.add_argument("--count", "-n", type=int, default=30, help="How many suggestions")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument(
@@ -95,6 +100,19 @@ def main() -> int:
 
     gen = Generator.load(seed=args.seed)
     selected = gen.themes.get(args.theme)
+    if args.mix is not None:
+        second = gen.themes.get(args.mix)
+        if selected is None or second is None:
+            print(
+                f"Error: unknown theme {args.theme if selected is None else args.mix!r}",
+                file=sys.stderr,
+            )
+            return 2
+        crossed = gen.crossed_theme(selected, second, args.lang)
+        chance = _mutation_chance(second.default_mutation, args.mutation_chance)
+        recipes = gen.generate_crossed_recipes(selected, second, args.count)
+        _print_suggestions([gen.render(r, crossed, 2, chance, args.lang) for r in recipes])
+        return 0
     try:
         suggestions = gen.suggest(
             theme_slug=args.theme,

@@ -414,3 +414,48 @@ def test_variant_keep_word_on_anchor_is_empty() -> None:
     theme = gen.anchored_theme("Sitemap", partner, "en")
     base = gen.generate_anchored_recipes("Sitemap", partner, 1)[0]
     assert gen.generate_variant_recipes(base, theme, VariantKeep.WORD, 20, "en") == []
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "language"),
+    [("whisky", "constellations", "en"), ("tierwelt", "greek-gods", "de")],
+)
+def test_crossed_themes_use_each_word_once(first: str, second: str, language: str) -> None:
+    """Themen-Mix: je ein Wort aus beiden Themes, keins doppelt, nie dasselbe zweimal."""
+    for seed_value in range(10):
+        gen = Generator.load(seed=seed_value)
+        a, b = gen.themes[first], gen.themes[second]
+        theme = gen.crossed_theme(a, b, language)
+        recipes = gen.generate_crossed_recipes(a, b, 40)
+        names = [gen.render(r, theme, 3, 0.0, language).name for r in recipes]
+        assert len(names) == 40
+        assert len(set(names)) == 40
+        assert len({r.anchor for r in recipes}) == 40
+        assert len({r.theme_word for r in recipes}) == 40
+        for r, name in zip(recipes, names, strict=True):
+            assert r.anchor in a.words and r.theme_word in b.words
+            beide = {
+                f"{r.anchor} {r.theme_word}".casefold(),
+                f"{r.theme_word} {r.anchor}".casefold(),
+            }
+            assert name.casefold() in beide, name
+
+
+def test_crossed_theme_never_pairs_a_word_with_itself() -> None:
+    gen = Generator.load(seed=2)
+    a = WordList(slug="a", name="A", description="", words=("Orion", "Lyra"))
+    b = WordList(slug="b", name="B", description="", words=("Orion", "Vega"))
+    recipes = gen.generate_crossed_recipes(a, b, 10)
+    assert all(r.anchor != r.theme_word for r in recipes)
+    assert len(recipes) == 2
+
+
+def test_crossed_variant_keeps_first_word() -> None:
+    """Zusatz halten auf einem Mix-Treffer behaelt das Wort aus dem ersten Theme."""
+    gen = Generator.load(seed=4)
+    a, b = gen.themes["whisky"], gen.themes["constellations"]
+    theme = gen.crossed_theme(a, b, "en")
+    base = gen.generate_crossed_recipes(a, b, 1)[0]
+    recipes = gen.generate_variant_recipes(base, theme, VariantKeep.MODIFIER, 20, "en")
+    assert len(recipes) == 20
+    assert all(r.anchor == base.anchor and r.theme_word != base.theme_word for r in recipes)

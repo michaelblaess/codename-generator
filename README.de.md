@@ -75,6 +75,10 @@ Themas (`Sitemap Orion`, `Pegasus Sitemap`). *Seed position* legt fest, ob dein 
 vorn oder hinten steht. Mit einem Partner-Thema mutiert nur dessen Wort, deins bleibt
 unverändert. Eine feste Position oder ein Partner-Thema legen zwei Wörter fest.
 
+**Themen-Mix** (*Mix with* im Einstellungspanel): Das aktive Thema wird mit einem
+zweiten gekreuzt, jeder Name besteht aus je einem Wort beider Themen (`Snowdon Lepus`,
+`Fomalhaut Lhotse`). Jedes Wort kommt pro Stapel höchstens einmal vor.
+
 **Variieren:** `w` hält das Wort des markierten Treffers und würfelt neue Zusätze
 (`Starke Viper` -> `Viper Wächter`), `m` hält den Zusatz und wechselt das Wort
 (`Starke Viper` -> `Starker Aal`, `Starkes Murmeltier`, richtig gebeugt). Aus einer Variante
@@ -112,6 +116,7 @@ uv run codename -t tierwelt -n 10       # deutsche Namen, korrekt gebeugt
 uv run codename -t swatch --lang de      # Eigennamen, deutsche Modifikatoren
 uv run codename -w Sitemap              # eigenes Wort mit Zusätzen
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
+uv run codename -t whisky --mix constellations   # Snowdon Lepus ...
 ```
 
 Ein `*` neben einem Vorschlag bedeutet, dass eine phonetische Mutation angewendet wurde

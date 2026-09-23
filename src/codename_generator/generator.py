@@ -495,6 +495,68 @@ class Generator:
             )
         return recipes
 
+    def crossed_theme(
+        self, first: WordList, second: WordList, language: str | None = None
+    ) -> WordList:
+        """Virtuelles Theme: zwei Themes gekreuzt ("Taurus Orion", "Orion Taurus").
+
+        Technisch ein Anker, der wechselt: das Wort aus `first` steht als Anker
+        im Recipe, das aus `second` als Theme-Wort. Damit gelten Genus,
+        Mutation und Sprache von `second`, und mutiert wird nur dessen Wort.
+        """
+        return WordList(
+            slug=f"mix-{first.slug}-{second.slug}",
+            name=f"{first.name} x {second.name}",
+            description=f"{first.name} crossed with {second.name}",
+            words=second.words,
+            patterns=tuple(p.value for p in anchor_theme_patterns(AnchorPosition.ANY)),
+            mutate=second.mutate,
+            default_mutation=second.default_mutation,
+            language=effective_language(second, language),
+            genders=second.genders,
+        )
+
+    def generate_crossed_recipes(
+        self, first: WordList, second: WordList, count: int = 30
+    ) -> list[Recipe]:
+        """Recipes aus je einem Wort beider Themes - jedes Wort hoechstens einmal.
+
+        Beide Seiten ohne Wiederholung, sonst stuende ein kurzes Theme in jedem
+        zweiten Namen. Ein Wort, das in beiden Themes vorkommt, wird nie mit
+        sich selbst gekreuzt.
+        """
+        pattern_choices = len(anchor_theme_patterns(AnchorPosition.ANY))
+        recipes: list[Recipe] = []
+        seen_first: set[str] = set()
+        seen_second: set[str] = set()
+        attempts = 0
+        max_attempts = count * 40
+        while first.words and second.words and len(recipes) < count and attempts < max_attempts:
+            attempts += 1
+            anchor = self.rng.choice(first.words)
+            word = self.rng.choice(second.words)
+            if (
+                anchor.casefold() == word.casefold()
+                or anchor.casefold() in seen_first
+                or word.casefold() in seen_second
+            ):
+                continue
+            seen_first.add(anchor.casefold())
+            seen_second.add(word.casefold())
+            recipes.append(
+                Recipe(
+                    theme_word=word,
+                    adjective="",
+                    verb="",
+                    agent="",
+                    pattern_index=self.rng.randrange(pattern_choices),
+                    mutation_roll=self.rng.random(),
+                    mutation_seed=self.rng.randrange(_SEED_CEILING),
+                    anchor=anchor,
+                )
+            )
+        return recipes
+
     def generate_recipes(
         self, theme_slug: str, count: int = 30, language: str | None = None
     ) -> list[Recipe]:
