@@ -65,7 +65,13 @@ run.bat          # Windows
 uv run codename  # jede Plattform
 ```
 
-Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `l` Sprache · `a` Info · `q` beenden
+Tasten: `r` neu generieren · `c` Slug kopieren · `n` Name kopieren · `m` Mutation +25% · `t` Thema wechseln · `f` Favorit · `v` Favoriten anzeigen · `i` eigenes Wort · `+` eigene Idee · `l` Sprache · `a` Info · `q` beenden
+
+**Eigenes Wort** (`i`, Eintrag *Custom Seed*): Dein Wort wird mit Adjektiven und Verben
+kombiniert oder, über *Seed partner* im Einstellungspanel, mit den Wörtern eines
+Themas (`Sitemap Orion`, `Pegasus Sitemap`). *Seed position* legt fest, ob dein Wort
+vorn oder hinten steht. Mit einem Partner-Thema mutiert nur dessen Wort, deins bleibt
+unverändert. Eine feste Position oder ein Partner-Thema legen zwei Wörter fest.
 
 Das linke Einstellungspanel hat drei Schieberegler - **Mutationswahrscheinlichkeit**
 (0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Wörter pro Name) und
@@ -96,6 +102,8 @@ uv run codename -t whisky --words 3     # exactly 3 components per name
 uv run codename --list-themes --lang de  # deutsche plus neutrale Themen
 uv run codename -t tierwelt -n 10       # deutsche Namen, korrekt gebeugt
 uv run codename -t swatch --lang de      # Eigennamen, deutsche Modifikatoren
+uv run codename -w Sitemap              # eigenes Wort mit Zusätzen
+uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
 ```
 
 Ein `*` neben einem Vorschlag bedeutet, dass eine phonetische Mutation angewendet wurde

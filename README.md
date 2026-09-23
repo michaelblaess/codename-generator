@@ -65,7 +65,13 @@ run.bat          # Windows
 uv run codename  # any platform
 ```
 
-Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `l` language · `a` about · `q` quit
+Keys: `r` regenerate · `c` copy slug · `n` copy name · `m` bump mutation +25% · `t` cycle theme · `f` favorite · `v` view favorites · `i` your own word · `+` your own idea · `l` language · `a` about · `q` quit
+
+**Your own word** (`i`, entry *Custom Seed*): your word is combined with adjectives and
+verbs or, via *Seed partner* in the settings panel, with the words of a theme
+(`Sitemap Orion`, `Pegasus Sitemap`). *Seed position* decides whether your word stands
+in front or at the back. With a partner theme only the partner's word mutates, yours
+stays as typed. A fixed position or a partner theme sets the name to two words.
 
 The left settings panel has three sliders - **mutation chance** (0-100%),
 **word count** (1, 2 or 3 visible words per name) and **suggestions**
@@ -94,6 +100,8 @@ uv run codename -t whisky --words 3     # exactly 3 components per name
 uv run codename --list-themes --lang de  # German plus the neutral themes
 uv run codename -t tierwelt -n 10       # German names, inflected
 uv run codename -t swatch --lang de      # proper names, German modifiers
+uv run codename -w Sitemap              # your own word with modifiers
+uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
 ```
 
 A `*` next to a suggestion means a phonetic mutation was applied

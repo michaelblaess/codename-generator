@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import io
 import sys
 
-from codename_generator.generator import Generator
+from codename_generator.generator import AnchorPosition, Generator, Suggestion
 from codename_generator.wordlist import NEUTRAL_LANGUAGE
 
 # Mutationswahrscheinlichkeit, wenn weder Aufruf noch Theme etwas vorgeben.
@@ -27,7 +28,22 @@ def main() -> int:
     parser.add_argument(
         "--theme",
         "-t",
-        help="Theme slug (e.g. greek-gods, flowers). Omit to launch TUI.",
+        help=(
+            "Theme slug (e.g. greek-gods, flowers). Omit to launch TUI. "
+            "With --word the theme becomes the partner of your word."
+        ),
+    )
+    parser.add_argument(
+        "--word",
+        "-w",
+        default=None,
+        help='Your own word (e.g. "Sitemap"), combined with modifiers or with --theme',
+    )
+    parser.add_argument(
+        "--position",
+        choices=[p.value for p in AnchorPosition],
+        default=AnchorPosition.ANY.value,
+        help="Where your --word stands in the name (default: any)",
     )
     parser.add_argument("--count", "-n", type=int, default=30, help="How many suggestions")
     parser.add_argument("--seed", type=int, default=None)
@@ -55,6 +71,14 @@ def main() -> int:
         help="Language for neutral themes and for --list-themes (e.g. en, de)",
     )
     args = parser.parse_args()
+
+    # In einer Pipe schreibt Python unter Windows cp1252 - "Stürzender" kam
+    # dann als "St?rzender" an (belegt am 23.09.2026). Die Namen sind UTF-8.
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+    if args.word is not None:
+        return _print_anchored(args)
 
     if args.list_themes or args.theme is None:
         if args.theme is None and not args.list_themes:
@@ -85,9 +109,38 @@ def main() -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
+    _print_suggestions(suggestions)
+    return 0
+
+
+def _print_suggestions(suggestions: list[Suggestion]) -> None:
     for i, s in enumerate(suggestions, 1):
         flag = " *" if s.mutated else "  "
         print(f"{i:2d}.{flag} {s.name:30s} {s.slug}")
+
+
+def _print_anchored(args: argparse.Namespace) -> int:
+    """Eigenes Wort mit Zusaetzen, oder mit --theme als Partner-Thema."""
+    word = str(args.word).strip()
+    if not word:
+        print("Error: --word must not be empty", file=sys.stderr)
+        return 2
+    gen = Generator.load(seed=args.seed)
+    position = AnchorPosition(args.position)
+    language = args.lang or "en"
+    if args.theme is None:
+        theme = gen.seeded_theme(word, language, position)
+        recipes = gen.generate_seeded_recipes(word, args.count, language, position)
+        chance = _mutation_chance(None, args.mutation_chance)
+    else:
+        partner = gen.themes.get(args.theme)
+        if partner is None:
+            print(f"Error: unknown theme {args.theme!r}", file=sys.stderr)
+            return 2
+        theme = gen.anchored_theme(word, partner, language, position)
+        recipes = gen.generate_anchored_recipes(word, partner, args.count, position)
+        chance = _mutation_chance(partner.default_mutation, args.mutation_chance)
+    _print_suggestions([gen.render(r, theme, args.words, chance, language) for r in recipes])
     return 0
 
 

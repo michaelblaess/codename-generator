@@ -16,7 +16,20 @@
     { "_note": "Eigene Idee bleibt ein Stueck", "pattern": "theme", "sources": ["Sitemap Pioneer"], "expected": { "name": "Sitemap Pioneer", "slug": "sitemap-pioneer" } },
     { "_note": "Eigene Idee klein getippt", "pattern": "theme", "sources": ["sitemap pioneer"], "expected": { "name": "Sitemap Pioneer", "slug": "sitemap-pioneer" } },
     { "_note": "Modifikator fehlt", "pattern": "adj-theme", "sources": ["Falcon"], "expected": { "name": "Falcon", "slug": "falcon" } },
-    { "_note": "Drei Woerter, nur ein Modifikator", "pattern": "adj-theme-verb", "sources": ["Falcon", "silent"], "expected": { "name": "Falcon", "slug": "falcon" } }
+    { "_note": "Drei Woerter, nur ein Modifikator", "pattern": "adj-theme-verb", "sources": ["Falcon", "silent"], "expected": { "name": "Falcon", "slug": "falcon" } },
+    { "_note": "Anker vorn", "pattern": "anchor-theme", "sources": ["Orion", "Sitemap"], "expected": { "name": "Sitemap Orion", "slug": "sitemap-orion" } },
+    { "_note": "Anker hinten", "pattern": "theme-anchor", "sources": ["Möwe", "Sitemap"], "expected": { "name": "Möwe Sitemap", "slug": "moewe-sitemap" } }
+  ],
+  "anchor_patterns": [
+    { "_note": "Zusaetze englisch, egal", "kind": "modifier", "language": "en", "position": "any", "expected": ["adj-theme", "verb-theme", "theme-verb", "theme-agent"] },
+    { "_note": "Zusaetze englisch, Wort vorn", "kind": "modifier", "language": "en", "position": "front", "expected": ["theme-verb", "theme-agent"] },
+    { "_note": "Zusaetze englisch, Wort hinten", "kind": "modifier", "language": "en", "position": "back", "expected": ["adj-theme", "verb-theme"] },
+    { "_note": "Zusaetze deutsch, egal", "kind": "modifier", "language": "de", "position": "any", "expected": ["adj-theme", "verb-theme", "theme-agent"] },
+    { "_note": "Zusaetze deutsch, Wort vorn", "kind": "modifier", "language": "de", "position": "front", "expected": ["theme-agent"] },
+    { "_note": "Zusaetze deutsch, Wort hinten", "kind": "modifier", "language": "de", "position": "back", "expected": ["adj-theme", "verb-theme"] },
+    { "_note": "Partner-Thema, egal", "kind": "theme", "language": "en", "position": "any", "expected": ["anchor-theme", "theme-anchor"] },
+    { "_note": "Partner-Thema, Wort vorn", "kind": "theme", "language": "de", "position": "front", "expected": ["anchor-theme"] },
+    { "_note": "Partner-Thema, Wort hinten", "kind": "theme", "language": "en", "position": "back", "expected": ["theme-anchor"] }
   ],
   "slugify": [
     { "input": "Grüner Blitz", "expected": "gruener-blitz" },
@@ -173,6 +186,34 @@
       "recipe": { "theme_word": "œuvre", "adjective": "still", "verb": "jagend", "agent": "", "pattern_index": 0 },
       "word_count": 2, "language": "de",
       "expected": { "name": "Stiller Œuvre", "slug": "stiller-oeuvre", "pattern": "adj-theme", "sources": ["œuvre", "stiller"] }
+    },
+    {
+      "_note": "Anker vorn mit Partner-Thema",
+      "theme": { "words": ["Orion", "Lyra"], "patterns": ["anchor-theme", "theme-anchor"], "language": "en" },
+      "recipe": { "theme_word": "Lyra", "adjective": "", "verb": "", "agent": "", "pattern_index": 0, "anchor": "Sitemap" },
+      "word_count": 3, "language": "en",
+      "expected": { "name": "Sitemap Lyra", "slug": "sitemap-lyra", "pattern": "anchor-theme", "sources": ["Lyra", "Sitemap"] }
+    },
+    {
+      "_note": "Anker hinten, deutsches Partner-Thema, nichts wird gebeugt",
+      "theme": { "words": ["Eule"], "genders": ["f"], "patterns": ["anchor-theme", "theme-anchor"], "language": "de" },
+      "recipe": { "theme_word": "Eule", "adjective": "", "verb": "", "agent": "", "pattern_index": 1, "anchor": "Sitemap" },
+      "word_count": 2, "language": "de",
+      "expected": { "name": "Eule Sitemap", "slug": "eule-sitemap", "pattern": "theme-anchor", "sources": ["Eule", "Sitemap"] }
+    },
+    {
+      "_note": "Anker mit mehrteiligem Partner-Wort",
+      "theme": { "words": ["Hoover Dam"], "patterns": ["theme-anchor"], "language": "neutral" },
+      "recipe": { "theme_word": "Hoover Dam", "adjective": "", "verb": "", "agent": "", "pattern_index": 0, "anchor": "Sitemap" },
+      "word_count": 2, "language": "de",
+      "expected": { "name": "Hoover Dam Sitemap", "slug": "hoover-dam-sitemap", "pattern": "theme-anchor", "sources": ["Hoover Dam", "Sitemap"] }
+    },
+    {
+      "_note": "Eigenes Wort mit Zusatz, Position vorn (deutsch nur Agent)",
+      "theme": { "words": ["Sitemap"], "patterns": ["theme-agent"], "language": "de" },
+      "recipe": { "theme_word": "Sitemap", "adjective": "still", "verb": "jagend", "agent": "wächter", "pattern_index": 5 },
+      "word_count": 3, "language": "de",
+      "expected": { "name": "Sitemap Wächter", "slug": "sitemap-waechter", "pattern": "theme-agent", "sources": ["Sitemap", "wächter"] }
     }
   ]
 }

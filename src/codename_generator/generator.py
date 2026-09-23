@@ -33,6 +33,19 @@ class Pattern(StrEnum):
     # Beide Modifier vorangestellt - die deutsche Entsprechung zu
     # ADJ_THEME_VERB ("Stiller Jagender Falke" statt "Silent Falcon Runs").
     ADJ_VERB_THEME = "adj-verb-theme"
+    # Anker: ein eigenes Wort zusammen mit einem Wort aus einem Thema
+    # ("Sitemap Orion", "Orion Sitemap"). Der Anker wird nie gebeugt - aus
+    # "Sitemap" darf im Deutschen kein "Sitemaper" werden.
+    ANCHOR_THEME = "anchor-theme"
+    THEME_ANCHOR = "theme-anchor"
+
+
+class AnchorPosition(StrEnum):
+    """Wo das eigene Wort im Namen steht."""
+
+    ANY = "any"
+    FRONT = "front"
+    BACK = "back"
 
 
 # Anzahl der Komponenten (Modifier + Theme-Wort) pro Pattern.
@@ -44,7 +57,13 @@ PATTERN_WORD_COUNT: dict[Pattern, int] = {
     Pattern.THEME_AGENT: 2,
     Pattern.ADJ_THEME_VERB: 3,
     Pattern.ADJ_VERB_THEME: 3,
+    Pattern.ANCHOR_THEME: 2,
+    Pattern.THEME_ANCHOR: 2,
 }
+
+# Zwei-Wort-Patterns, deren Modifier VOR dem Theme-Wort steht. Beim eigenen
+# Wort heisst das: das Wort steht hinten ("Silent Sitemap").
+_PREFIX_PATTERNS = frozenset({Pattern.ADJ_THEME, Pattern.VERB_THEME})
 
 # Zwei-Wort-Patterns, aus denen `_select_pattern` zufaellig waehlt.
 # Agent-Suffix gehoert dazu - typische Tool-Naming-Konvention (Sitemap Runner).
@@ -82,6 +101,29 @@ def _three_word_pattern(language: str) -> Pattern:
     return _THREE_WORD_PATTERN_BY_LANGUAGE.get(language, Pattern.ADJ_THEME_VERB)
 
 
+def anchor_modifier_patterns(language: str, position: AnchorPosition) -> tuple[Pattern, ...]:
+    """Zwei-Wort-Patterns fuer ein eigenes Wort mit Zusaetzen, gefiltert nach Position.
+
+    FRONT stellt das Wort nach vorn ("Sitemap Runner"), BACK nach hinten
+    ("Silent Sitemap"), ANY laesst alle Patterns der Sprache zu.
+    """
+    patterns = _two_word_patterns(language)
+    if position == AnchorPosition.FRONT:
+        return tuple(p for p in patterns if p not in _PREFIX_PATTERNS)
+    if position == AnchorPosition.BACK:
+        return tuple(p for p in patterns if p in _PREFIX_PATTERNS)
+    return patterns
+
+
+def anchor_theme_patterns(position: AnchorPosition) -> tuple[Pattern, ...]:
+    """Patterns fuer ein eigenes Wort mit einem Partner-Thema, gefiltert nach Position."""
+    if position == AnchorPosition.FRONT:
+        return (Pattern.ANCHOR_THEME,)
+    if position == AnchorPosition.BACK:
+        return (Pattern.THEME_ANCHOR,)
+    return (Pattern.ANCHOR_THEME, Pattern.THEME_ANCHOR)
+
+
 @dataclass(frozen=True)
 class Recipe:
     """Die stabilen Zutaten eines Vorschlags - unabhaengig von Mutation/Wortzahl.
@@ -98,6 +140,8 @@ class Recipe:
     pattern_index: int
     mutation_roll: float
     mutation_seed: int
+    # Eigenes Wort bei ANCHOR_THEME / THEME_ANCHOR, sonst leer.
+    anchor: str = ""
 
 
 @dataclass(frozen=True)
@@ -160,7 +204,7 @@ def _compose_name(pattern: Pattern, theme_word: str, modifiers: tuple[str, ...])
     mods = list(modifiers)
     if pattern == Pattern.THEME_ONLY:
         return theme_word
-    if pattern in (Pattern.THEME_VERB, Pattern.THEME_AGENT):
+    if pattern in (Pattern.THEME_VERB, Pattern.THEME_AGENT, Pattern.THEME_ANCHOR):
         return f"{theme_word} {mods[0]}" if mods else theme_word
     if pattern == Pattern.ADJ_THEME_VERB:
         if len(mods) >= 2:
@@ -170,7 +214,7 @@ def _compose_name(pattern: Pattern, theme_word: str, modifiers: tuple[str, ...])
         if len(mods) >= 2:
             return f"{mods[0]} {mods[1]} {theme_word}"
         return theme_word
-    # ADJ_THEME und VERB_THEME: Modifier vorangestellt.
+    # ADJ_THEME, VERB_THEME und ANCHOR_THEME: Modifier vorangestellt.
     return f"{mods[0]} {theme_word}" if mods else theme_word
 
 
@@ -267,7 +311,11 @@ class Generator:
         return wordlist.words if wordlist else ()
 
     def generate_seeded_recipes(
-        self, seed: str, count: int = 30, language: str = DEFAULT_LANGUAGE
+        self,
+        seed: str,
+        count: int = 30,
+        language: str = DEFAULT_LANGUAGE,
+        position: AnchorPosition = AnchorPosition.ANY,
     ) -> list[Recipe]:
         """Erzeugt `count` Recipes mit einem festen `seed` als Theme-Wort.
 
@@ -279,7 +327,8 @@ class Generator:
         Woertern Adjektiv plus Verb. Die ganze Kombination als Schluessel
         reichte nicht: zwei Recipes mit gleichem Adjektiv und verschiedenem
         Verb ergaben zweimal "Silent Sitemap". Modifier kommen aus den Pools
-        der uebergebenen Sprache.
+        der uebergebenen Sprache. `position` muss dieselbe sein wie beim
+        passenden `seeded_theme`, sonst zeigen Index und Pattern auseinander.
         """
         adjectives = self._modifier_pool(language, "adjectives")
         verbs = self._modifier_pool(language, "verbs")
@@ -291,7 +340,7 @@ class Generator:
         max_attempts = count * 40
         # Anzahl der Patterns, aus denen gezogen wird - korrespondiert mit
         # _two_word_patterns in _select_pattern.
-        two_word_patterns = _two_word_patterns(language)
+        two_word_patterns = anchor_modifier_patterns(language, position)
         pattern_choices = len(two_word_patterns)
         while len(recipes) < count and attempts < max_attempts:
             attempts += 1
@@ -319,20 +368,96 @@ class Generator:
             )
         return recipes
 
-    def seeded_theme(self, seed: str, language: str = DEFAULT_LANGUAGE) -> WordList:
+    def seeded_theme(
+        self,
+        seed: str,
+        language: str = DEFAULT_LANGUAGE,
+        position: AnchorPosition = AnchorPosition.ANY,
+    ) -> WordList:
         """Erzeugt ein virtuelles WordList fuer das Custom-Seed-Theme.
 
-        Das Theme hat nur das Seed-Wort als Inhalt; Pattern und Mutation
-        bleiben offen (gesteuert von den Slidern). Wird vom TUI in
-        `Generator.render()` als `theme`-Argument uebergeben.
+        Das Theme hat nur das Seed-Wort als Inhalt. Bei ANY bleiben Pattern und
+        Mutation offen (gesteuert von den Slidern). Eine feste Position legt die
+        Patterns fest und damit zwei Woerter - wie bei einem Theme, das eigene
+        Patterns mitbringt. Wird vom TUI in `Generator.render()` als
+        `theme`-Argument uebergeben.
         """
+        patterns = (
+            ()
+            if position == AnchorPosition.ANY
+            else tuple(p.value for p in anchor_modifier_patterns(language, position))
+        )
         return WordList(
             slug=CUSTOM_SEED_SLUG,
             name=f"Custom Seed: {seed}",
             description="your idea combined with adjectives and verbs",
             words=(seed,),
+            patterns=patterns,
             language=language,
         )
+
+    def anchored_theme(
+        self,
+        anchor: str,
+        partner: WordList,
+        language: str | None = None,
+        position: AnchorPosition = AnchorPosition.ANY,
+    ) -> WordList:
+        """Virtuelles Theme: das eigene Wort zusammen mit den Woertern eines Partner-Themas.
+
+        Die Woerter, Genera und Mutationsregeln kommen vom Partner, die
+        Patterns legen die Stellung des eigenen Worts fest ("Sitemap Orion"
+        oder "Orion Sitemap"). Mutiert wird nur das Wort des Partners.
+        """
+        return WordList(
+            slug=f"{CUSTOM_SEED_SLUG}-{partner.slug}",
+            name=f"{anchor} + {partner.name}",
+            description=partner.description,
+            words=partner.words,
+            patterns=tuple(p.value for p in anchor_theme_patterns(position)),
+            mutate=partner.mutate,
+            default_mutation=partner.default_mutation,
+            language=effective_language(partner, language),
+            genders=partner.genders,
+        )
+
+    def generate_anchored_recipes(
+        self,
+        anchor: str,
+        partner: WordList,
+        count: int = 30,
+        position: AnchorPosition = AnchorPosition.ANY,
+    ) -> list[Recipe]:
+        """Recipes aus eigenem Wort und Partner-Thema, jedes Partner-Wort hoechstens einmal.
+
+        Ein Partner-Wort, das dem eigenen Wort gleicht, faellt weg - sonst kaeme
+        "Orion Orion" heraus.
+        """
+        pattern_choices = len(anchor_theme_patterns(position))
+        candidates = [w for w in partner.words if w.casefold() != anchor.casefold()]
+        recipes: list[Recipe] = []
+        seen: set[str] = set()
+        attempts = 0
+        max_attempts = count * 40
+        while candidates and len(recipes) < count and attempts < max_attempts:
+            attempts += 1
+            word = self.rng.choice(candidates)
+            if word.casefold() in seen:
+                continue
+            seen.add(word.casefold())
+            recipes.append(
+                Recipe(
+                    theme_word=word,
+                    adjective="",
+                    verb="",
+                    agent="",
+                    pattern_index=self.rng.randrange(pattern_choices),
+                    mutation_roll=self.rng.random(),
+                    mutation_seed=self.rng.randrange(_SEED_CEILING),
+                    anchor=anchor,
+                )
+            )
+        return recipes
 
     def generate_recipes(
         self, theme_slug: str, count: int = 30, language: str | None = None
@@ -466,6 +591,13 @@ class Generator:
             case Pattern.ADJ_VERB_THEME:
                 name = f"{adjective} {attributive_verb} {rendered}"
                 sources = (recipe.theme_word, adjective, attributive_verb)
+            # Der Anker bleibt ungebeugt, er ist ein Name und kein Attribut.
+            case Pattern.ANCHOR_THEME:
+                name = f"{recipe.anchor} {rendered}"
+                sources = (recipe.theme_word, recipe.anchor)
+            case Pattern.THEME_ANCHOR:
+                name = f"{rendered} {recipe.anchor}"
+                sources = (recipe.theme_word, recipe.anchor)
 
         return Suggestion(
             name=name.title(),

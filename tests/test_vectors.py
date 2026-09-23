@@ -15,7 +15,16 @@ from typing import Any, TypeVar
 
 import pytest
 
-from codename_generator.generator import Generator, Pattern, Recipe, Suggestion, _slugify
+from codename_generator.generator import (
+    AnchorPosition,
+    Generator,
+    Pattern,
+    Recipe,
+    Suggestion,
+    _slugify,
+    anchor_modifier_patterns,
+    anchor_theme_patterns,
+)
 from codename_generator.grammar import inflect_attribute
 from codename_generator.phonetic import mutate
 from codename_generator.wordlist import WordList
@@ -106,6 +115,7 @@ def test_render(case: dict[str, Any]) -> None:
         # Ohne Mutation - deren Zufall ist zwischen Python und JS verschieden.
         mutation_roll=1.0,
         mutation_seed=0,
+        anchor=raw.get("anchor", ""),
     )
     suggestion = generator.render(
         recipe,
@@ -136,3 +146,16 @@ def test_favorite(case: dict[str, Any]) -> None:
     assert rendered.name == case["expected"]["name"]
     assert rendered.slug == case["expected"]["slug"]
     assert rendered.mutated is False
+
+
+@pytest.mark.parametrize(
+    "case", _VECTORS["anchor_patterns"], ids=_ids(_VECTORS["anchor_patterns"], "_note")
+)
+def test_anchor_patterns(case: dict[str, Any]) -> None:
+    position = AnchorPosition(case["position"])
+    patterns = (
+        anchor_modifier_patterns(case["language"], position)
+        if case["kind"] == "modifier"
+        else anchor_theme_patterns(position)
+    )
+    assert [p.value for p in patterns] == case["expected"]

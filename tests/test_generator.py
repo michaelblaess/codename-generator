@@ -5,6 +5,7 @@ import pytest
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
     PATTERN_WORD_COUNT,
+    AnchorPosition,
     Generator,
     Pattern,
 )
@@ -294,3 +295,46 @@ def test_random_theme_exists_and_pools_words() -> None:
         if not slug.startswith("random") and theme.language in ("en", "neutral"):
             other_words.update(theme.words)
     assert random_words == other_words
+
+
+@pytest.mark.parametrize("position", list(AnchorPosition))
+def test_anchored_names_follow_position_and_never_repeat(position: AnchorPosition) -> None:
+    """Eigenes Wort plus Partner-Thema: Stellung wie gewaehlt, kein Name doppelt."""
+    for seed_value in range(10):
+        gen = Generator.load(seed=seed_value)
+        partner = gen.themes["constellations"]
+        theme = gen.anchored_theme("Sitemap", partner, "en", position)
+        recipes = gen.generate_anchored_recipes("Sitemap", partner, 40, position)
+        names = [gen.render(r, theme, 3, 0.0, "en").name for r in recipes]
+        assert len(names) == 40
+        assert len(set(names)) == 40
+        for name in names:
+            assert name.count("Sitemap") == 1, name
+            if position == AnchorPosition.FRONT:
+                assert name.startswith("Sitemap "), name
+            if position == AnchorPosition.BACK:
+                assert name.endswith(" Sitemap"), name
+
+
+def test_anchored_skips_partner_word_equal_to_anchor() -> None:
+    """Kein "Orion Orion" - das gleiche Wort im Partner-Thema faellt weg."""
+    gen = Generator.load(seed=1)
+    partner = WordList(slug="p", name="p", description="", words=("Orion", "Lyra", "Vega"))
+    recipes = gen.generate_anchored_recipes("orion", partner, 10)
+    assert sorted(r.theme_word for r in recipes) == ["Lyra", "Vega"]
+
+
+@pytest.mark.parametrize("language", ["en", "de"])
+def test_seeded_position_puts_word_where_asked(language: str) -> None:
+    """Eigenes Wort mit Zusaetzen: vorn heisst "Sitemap ...", hinten "... Sitemap"."""
+    gen = Generator.load(seed=3)
+    for position in (AnchorPosition.FRONT, AnchorPosition.BACK):
+        theme = gen.seeded_theme("Sitemap", language, position)
+        recipes = gen.generate_seeded_recipes("Sitemap", 30, language, position)
+        names = [gen.render(r, theme, 3, 0.0, language).name for r in recipes]
+        assert len(set(names)) == len(names) == 30
+        for name in names:
+            if position == AnchorPosition.FRONT:
+                assert name.startswith("Sitemap "), name
+            else:
+                assert name.endswith(" Sitemap"), name

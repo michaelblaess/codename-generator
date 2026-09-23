@@ -36,13 +36,24 @@ from codename_generator import __author__, __version__, __year__
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
     RANDOM_THEME_SLUG,
+    AnchorPosition,
     Generator,
     Pattern,
     Recipe,
     Suggestion,
 )
 from codename_generator.settings import JsonSettingsStore
-from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE
+from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE, WordList
+
+# Auswahlwert "kein Partner-Thema" - der Custom Seed zieht dann Adjektive und
+# Verben. Ein leerer String taugt nicht, Select behandelt ihn wie "nichts".
+SEED_PARTNER_MODIFIERS = "__modifiers__"
+
+SEED_POSITION_LABELS: dict[AnchorPosition, str] = {
+    AnchorPosition.ANY: "Anywhere",
+    AnchorPosition.FRONT: "Word in front",
+    AnchorPosition.BACK: "Word at the back",
+}
 
 _DICKINSON_QUOTE = "That it will never come again is what makes life so sweet."
 
@@ -359,11 +370,23 @@ class CodenameApp(App[None]):
         self.suggestion_count = self._coerce_count(settings.get("suggestion_count"))
         self.favorites = self._deserialize_favorites(settings.get("favorites"))
         self._custom_seed = str(settings.get("custom_seed", "")).strip()
+        # Partner des Custom Seed: leer = Adjektive und Verben, sonst ein Theme-Slug.
+        partner = str(settings.get("seed_partner", ""))
+        self._seed_partner = partner if partner in self.generator.themes else ""
+        self._seed_position = self._coerce_position(settings.get("seed_position"))
         self._startup_theme = str(settings.get("theme", "")) or self.DEFAULT_THEME
         self.content_language = self._coerce_language(settings.get("language"))
         visible = self._visible_theme_slugs()
         if self.theme_slug not in visible:
             self.theme_slug = visible[0] if visible else ""
+
+    @staticmethod
+    def _coerce_position(raw: object) -> AnchorPosition:
+        """Uebernimmt eine gespeicherte Position, sonst ANY."""
+        try:
+            return AnchorPosition(str(raw))
+        except ValueError:
+            return AnchorPosition.ANY
 
     def _coerce_language(self, raw: object) -> str:
         """Uebernimmt eine gespeicherte Sprache nur, wenn es sie noch gibt."""
@@ -454,6 +477,8 @@ class CodenameApp(App[None]):
                 "suggestion_count": self.suggestion_count,
                 "favorites": self._serialize_favorites(),
                 "custom_seed": self._custom_seed,
+                "seed_partner": self._seed_partner,
+                "seed_position": self._seed_position.value,
                 "language": self.content_language,
             }
         )
@@ -530,6 +555,20 @@ class CodenameApp(App[None]):
                         allow_blank=False,
                         id="language-select",
                     )
+                    yield Static("Seed partner", classes="settings-label")
+                    yield Select(
+                        self._partner_options(),
+                        value=self._seed_partner or SEED_PARTNER_MODIFIERS,
+                        allow_blank=False,
+                        id="seed-partner-select",
+                    )
+                    yield Static("Seed position", classes="settings-label")
+                    yield Select(
+                        [(label, pos.value) for pos, label in SEED_POSITION_LABELS.items()],
+                        value=self._seed_position.value,
+                        allow_blank=False,
+                        id="seed-position-select",
+                    )
             yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
             with Vertical(id="right-pane"):
                 yield Static(id="info")
@@ -605,27 +644,75 @@ class CodenameApp(App[None]):
         count_label.set_class(False, "locked")
         count_label.update(f"Suggestions: [b]{self.suggestion_count}[/b]")
 
+    def _partner_options(self) -> list[tuple[str, str]]:
+        """Auswahl fuer den Partner des Custom Seed: Zusaetze oder ein sichtbares Theme."""
+        options = [("Adjectives & verbs", SEED_PARTNER_MODIFIERS)]
+        for slug in self._visible_theme_slugs():
+            options.append((self.generator.themes[slug].name, slug))
+        return options
+
+    def _seed_theme(self) -> WordList:
+        """Virtuelles Theme des Custom Seed - mit Zusaetzen oder mit Partner-Theme."""
+        if self._seed_partner:
+            return self.generator.anchored_theme(
+                self._custom_seed,
+                self.generator.themes[self._seed_partner],
+                self.content_language,
+                self._seed_position,
+            )
+        return self.generator.seeded_theme(
+            self._custom_seed, self.content_language, self._seed_position
+        )
+
+    def _seed_recipes(self) -> list[Recipe]:
+        """Frische Recipes fuer den Custom Seed, passend zu Partner und Position."""
+        if self._seed_partner:
+            return self.generator.generate_anchored_recipes(
+                self._custom_seed,
+                self.generator.themes[self._seed_partner],
+                count=self.suggestion_count,
+                position=self._seed_position,
+            )
+        return self.generator.generate_seeded_recipes(
+            self._custom_seed,
+            count=self.suggestion_count,
+            language=self.content_language,
+            position=self._seed_position,
+        )
+
     def _update_seed_info(self) -> None:
         """Info-Zeile und Slider-Status fuer die Custom-Seed-Ansicht.
 
-        Alle drei Slider gelten (Mutation/Wortzahl/Vorschlagsanzahl) - genauso
-        wie bei einem normalen Theme. Theme-spezifische Sperren entfallen.
+        Mutation und Vorschlagsanzahl gelten immer. Die Wortzahl ist gesperrt,
+        sobald Partner-Theme oder Position das Pattern festlegen - dann sind es
+        genau zwei Woerter.
         """
-        self.query_one("#info", Static).update(
-            f'[b]Custom Seed[/b]  [dim]your idea "{self._custom_seed}" combined with '
-            "adjectives and verbs - press [b]i[/b] to change[/dim]"
+        partner = (
+            self.generator.themes[self._seed_partner].name
+            if self._seed_partner
+            else "adjectives and verbs"
         )
+        where = SEED_POSITION_LABELS[self._seed_position].lower()
+        self.query_one("#info", Static).update(
+            f'[b]Custom Seed[/b]  [dim]your idea "{self._custom_seed}" with {partner}, '
+            f"{where} - press [b]i[/b] to change[/dim]"
+        )
+        words_locked = bool(self._seed_theme().patterns)
         mut_label = self.query_one("#mutation-label", Static)
         wc_label = self.query_one("#wordcount-label", Static)
         count_label = self.query_one("#count-label", Static)
         self.query_one("#mutation-slider", Slider).disabled = False
-        self.query_one("#wordcount-slider", Slider).disabled = False
+        self.query_one("#wordcount-slider", Slider).disabled = words_locked
         self.query_one("#count-slider", Slider).disabled = False
         mut_label.set_class(False, "locked")
-        wc_label.set_class(False, "locked")
+        wc_label.set_class(words_locked, "locked")
         count_label.set_class(False, "locked")
         mut_label.update(f"Mutation: [b]{self.mutation_percent}%[/b]")
-        wc_label.update(f"Words: [b]{self.word_count}[/b]")
+        wc_label.update(
+            "Words: [b]locked by seed partner/position[/b]"
+            if words_locked
+            else f"Words: [b]{self.word_count}[/b]"
+        )
         count_label.update(f"Suggestions: [b]{self.suggestion_count}[/b]")
 
     def _update_favorites_info(self) -> None:
@@ -661,16 +748,12 @@ class CodenameApp(App[None]):
     def _ensure_seed_recipes(self) -> None:
         """Erzeugt Recipes fuer den aktuellen Custom-Seed, falls noch keine im Cache."""
         if self._custom_seed and CUSTOM_SEED_SLUG not in self._recipes:
-            self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
-                self._custom_seed, count=self.suggestion_count, language=self.content_language
-            )
+            self._recipes[CUSTOM_SEED_SLUG] = self._seed_recipes()
 
     def _fresh_recipes(self) -> None:
         """Verwirft die Recipes des aktuellen Themes/Seeds und erzeugt neue."""
         if self._seed_mode and self._custom_seed:
-            self._recipes[CUSTOM_SEED_SLUG] = self.generator.generate_seeded_recipes(
-                self._custom_seed, count=self.suggestion_count, language=self.content_language
-            )
+            self._recipes[CUSTOM_SEED_SLUG] = self._seed_recipes()
             return
         if self.theme_slug:
             self._recipes[self.theme_slug] = self.generator.generate_recipes(
@@ -714,7 +797,7 @@ class CodenameApp(App[None]):
         """Rendert die Custom-Seed-Recipes mit aktueller Mutation/Wortzahl."""
         if not self._custom_seed:
             return
-        theme = self.generator.seeded_theme(self._custom_seed, self.content_language)
+        theme = self._seed_theme()
         mutation = self.mutation_percent / 100.0
         recipes = self._recipes.get(CUSTOM_SEED_SLUG, [])
         self.suggestions = [
@@ -977,11 +1060,31 @@ class CodenameApp(App[None]):
         await self._apply_language(self.languages[(index + 1) % len(self.languages)])
 
     async def on_select_changed(self, event: Select.Changed) -> None:
-        """Sprachauswahl im Settings-Panel."""
-        if event.select.id != "language-select":
+        """Auswahlfelder im Settings-Panel: Sprache, Partner und Position des Seeds."""
+        if not isinstance(event.value, str):
             return
-        if isinstance(event.value, str):
+        if event.select.id == "language-select":
             await self._apply_language(event.value)
+        elif event.select.id == "seed-partner-select":
+            partner = "" if event.value == SEED_PARTNER_MODIFIERS else event.value
+            if partner == self._seed_partner or (partner and partner not in self.generator.themes):
+                return
+            self._seed_partner = partner
+            self._apply_seed_change(f"seed partner -> [b]{partner or 'adjectives & verbs'}[/b]")
+        elif event.select.id == "seed-position-select":
+            position = self._coerce_position(event.value)
+            if position == self._seed_position:
+                return
+            self._seed_position = position
+            self._apply_seed_change(f"seed position -> [b]{position.value}[/b]")
+
+    def _apply_seed_change(self, log_text: str) -> None:
+        """Partner oder Position des Seeds geaendert: neue Recipes, speichern, neu zeichnen."""
+        self._recipes.pop(CUSTOM_SEED_SLUG, None)
+        self._ensure_seed_recipes()
+        self._log_event(log_text)
+        self._save_settings()
+        self._rerender()
 
     async def _apply_language(self, language: str) -> None:
         """Uebernimmt eine neue Sprache: Liste, Modifier und Vorschlaege ziehen nach."""
@@ -1001,13 +1104,27 @@ class CodenameApp(App[None]):
         await list_view.clear()
         await list_view.extend(self._theme_items())
         # Faellt das aktive Theme aus der Sprache, uebernimmt das erste sichtbare.
+        # Favoriten- und Seed-Ansicht haengen an keinem Theme und bleiben stehen -
+        # vorher warf ein Sprachwechsel den Seed zurueck ins Random-Theme.
+        in_theme_view = not (self._favorites_mode or self._seed_mode)
         if self.theme_slug not in visible:
             self.theme_slug = visible[0]
-            self.sub_title = self.theme_slug
-            self._favorites_mode = False
-            self._seed_mode = False
-            self._apply_theme_default_mutation()
-        list_view.index = 2 + visible.index(self.theme_slug)
+            if in_theme_view:
+                self.sub_title = self.theme_slug
+                self._apply_theme_default_mutation()
+        if self._favorites_mode:
+            list_view.index = 0
+        elif self._seed_mode:
+            list_view.index = 1
+        else:
+            list_view.index = 2 + visible.index(self.theme_slug)
+        # Das Partner-Theme muss in der neuen Sprache sichtbar sein, sonst
+        # zurueck auf Adjektive und Verben.
+        if self._seed_partner and self._seed_partner not in visible:
+            self._seed_partner = ""
+        partner_select = self.query_one("#seed-partner-select", Select)
+        partner_select.set_options(self._partner_options())
+        partner_select.value = self._seed_partner or SEED_PARTNER_MODIFIERS
         self._ensure_recipes()
         self._ensure_seed_recipes()
         self._log_event(f"language -> [b]{self.content_language}[/b]")
