@@ -215,5 +215,81 @@
       "word_count": 3, "language": "de",
       "expected": { "name": "Sitemap Wächter", "slug": "sitemap-waechter", "pattern": "theme-agent", "sources": ["Sitemap", "wächter"] }
     }
+  ],
+  "coin": [
+    { "_note": "Nories", "words": ["Orion", "Octans", "Aries", "Lyra", "Vela", "Carina", "Norma", "Ara"], "script": [4, 6, 4, 6, 6, 5, 6, 3, 5, 0, 4, 2], "expected": "Nories" },
+    { "_note": "Carion", "words": ["Orion", "Octans", "Aries", "Lyra", "Vela", "Carina", "Norma", "Ara"], "script": [2, 0, 2, 1, 2, 7, 7, 2, 0, 0, 6, 7], "expected": "Carion" },
+    { "_note": "Cara, kurz genug", "words": ["Orion", "Octans", "Aries", "Lyra", "Vela", "Carina", "Norma", "Ara"], "script": [2, 4, 3, 3, 3, 4, 5, 5, 1, 1, 2, 1], "expected": "Cara" },
+    { "_note": "verworfen", "words": ["Orion", "Octans", "Aries", "Lyra", "Vela", "Carina", "Norma", "Ara"], "script": [3, 2, 5, 7, 1, 0, 7, 4, 3, 3, 7, 7], "expected": null }
+  ],
+  "coin_tokens": [
+    { "_note": "mehrteilig, Bindestrich, zu kurz, doppelt", "words": ["Ursa Minor", "Jean-Luc", "Ox", "orion", "Orion"], "expected": ["highland", "park", "jean", "luc", "orion"] }
+  ],
+  "blend": [
+    { "first": "Aries", "second": "Arcturus", "expected": "Arrus" },
+    { "first": "Orion", "second": "Taurus", "expected": "Orisker" },
+    { "first": "Leo", "second": "Orion", "expected": null },
+    { "first": "Falke", "second": "Adler", "expected": "Faler" },
+    { "first": "Cassiopeia", "second": "Orion", "expected": null },
+    { "first": "Vega", "second": "Vega", "expected": null },
+    { "first": "Ox", "second": "Orion", "expected": null },
+    { "first": "Bellatrix", "second": "Andromeda", "expected": "Bundromeda" },
+    { "first": "Fuchs", "second": "Luchs", "expected": null },
+    { "first": "Äskulap", "second": "Kranich", "expected": "Äskulanich" }
+  ],
+  "syllables": [
+    { "name": "Silent Falcon", "language": "en", "expected": 4 },
+    { "name": "Blade", "language": "en", "expected": 1 },
+    { "name": "Table", "language": "en", "expected": 2 },
+    { "name": "Yarrow", "language": "en", "expected": 2 },
+    { "name": "Pyro", "language": "en", "expected": 2 },
+    { "name": "Schneller Falke", "language": "de", "expected": 4 },
+    { "name": "Blade", "language": "de", "expected": 2 },
+    { "name": "Grünes Glühwürmchen", "language": "de", "expected": 5 },
+    { "name": "Orion", "language": "en", "expected": 2 },
+    { "name": "Rhythm", "language": "en", "expected": 1 }
+  ],
+  "score": [
+    { "name": "Silent Falcon", "language": "en", "expected": 100 },
+    { "name": "Orisker", "language": "en", "expected": 100 },
+    { "name": "Schneller Falke", "language": "de", "expected": 92 },
+    { "name": "Strykx Phantom", "language": "en", "expected": 83 },
+    { "name": "Ox", "language": "en", "expected": 78 },
+    { "name": "Grünes Glühwürmchen", "language": "de", "expected": 51 },
+    { "name": "Sly Serpent", "language": "en", "expected": 100 },
+    { "name": "Silent Swift Sparrow", "language": "en", "expected": 70 },
+    { "name": "Quixotic Axolotl Pioneer Of Eternity", "language": "en", "expected": 4 },
+    { "name": "Mississippi", "language": "en", "expected": 98 }
+  ],
+  "filter": [
+    { "name": "Silent Falcon", "filter": {"initial": "s"}, "language": "en", "expected": true },
+    { "name": "Silent Falcon", "filter": {"initial": "F"}, "language": "en", "expected": false },
+    { "name": "Silent Falcon", "filter": {"max_syllables": 3}, "language": "en", "expected": false },
+    { "name": "Silent Falcon", "filter": {"max_syllables": 4}, "language": "en", "expected": true },
+    { "name": "Sly Serpent", "filter": {"alliteration": true}, "language": "en", "expected": true },
+    { "name": "Silent Falcon", "filter": {"alliteration": true}, "language": "en", "expected": false },
+    { "name": "Orion", "filter": {"alliteration": true}, "language": "en", "expected": false },
+    { "name": "Sly Serpent", "filter": {"initial": "sl", "max_syllables": 3, "alliteration": true}, "language": "en", "expected": true }
+  ],
+  "letters": [
+    { "input": "S.M.T", "expected": "smt" },
+    { "input": "gft", "expected": "gft" },
+    { "input": "ab1cd", "expected": "abc" },
+    { "input": "Ä-z", "expected": "äz" },
+    { "input": "", "expected": "" }
+  ],
+  "tone_pool": [
+    { "language": "en", "role": "adjectives", "tone": "dark", "expected": ["silent", "hidden", "dark", "deep", "shadow", "hollow", "rogue", "dormant", "twilight", "dusk", "night", "nadir", "misty", "stormy", "foggy", "frozen", "obsidian", "indigo", "charcoal", "onyx", "ebony", "sable", "dreary", "gloomy", "shifty", "sneaky"] },
+    { "language": "de", "role": "agents", "tone": "calm", "expected": ["Hüter", "Weber", "Sammler", "Schreiber", "Chronist", "Zähler", "Verwalter", "Ratgeber", "Turmwart", "Sortierer", "Wanderer", "Pilger", "Bewahrer", "Hirte"] },
+    { "language": "en", "role": "verbs", "tone": "swift", "expected": ["chase", "dive", "fly", "jump", "leap", "move", "pass", "ride", "run", "send", "skip", "slip", "spin", "stride", "strike", "swing", "track", "turn"] },
+    { "language": "en", "role": "agents", "tone": "", "expected": ["runner", "generator", "inspector", "fixer", "crawler", "builder", "loader", "reader", "writer", "worker", "watcher", "tracker", "finder", "hunter", "sweeper", "scout", "scanner", "sniffer", "prober", "probe", "sentinel", "guardian", "keeper", "warden", "ranger", "pilot", "navigator", "courier", "herald", "messenger", "broker", "dispatcher", "router", "relay", "forge", "foundry", "smith", "wright", "maker", "architect", "composer", "crafter", "shaper", "sculptor", "engine", "core", "kernel", "reactor", "turbine", "boiler", "dynamo", "press", "auditor", "examiner", "analyst", "curator", "reviewer", "sentry", "lookout", "oracle", "diviner", "chaser", "racer", "rider", "drifter", "voyager", "explorer", "pioneer", "wanderer", "rogue", "bandit", "templar", "paladin", "knight", "duelist", "champion", "sage", "scholar", "scribe", "mentor", "master", "tutor", "apprentice", "daemon", "bot", "drone", "agent", "operator", "proxy", "bridge", "beacon", "lantern", "compass", "cartographer", "mapper", "indexer", "harvester", "gatherer", "collector", "sorter", "filter", "parser", "linker", "packer", "bundler", "launcher", "rocket", "shuttle", "cruiser", "vessel"] }
+  ],
+  "acronym_patterns": [
+    { "theme": "animals", "letters": "sm", "language": "en", "tone": "", "expected": ["adj-theme", "verb-theme", "theme-verb", "theme-agent"] },
+    { "theme": "tierwelt", "letters": "gft", "language": "de", "tone": "", "expected": ["adj-verb-theme"] },
+    { "theme": "constellations", "letters": "o", "language": "en", "tone": "", "expected": ["theme"] },
+    { "theme": "animals", "letters": "xq", "language": "en", "tone": "", "expected": [] },
+    { "theme": "animals", "letters": "sm", "language": "en", "tone": "dark", "expected": ["adj-theme", "verb-theme", "theme-verb", "theme-agent"] },
+    { "theme": "tierwelt", "letters": "hw", "language": "de", "tone": "", "expected": ["adj-theme", "verb-theme", "theme-agent"] }
   ]
 }

@@ -77,13 +77,31 @@ unverändert. Eine feste Position oder ein Partner-Thema legen zwei Wörter fest
 
 **Themen-Mix** (*Mix with* im Einstellungspanel): Das aktive Thema wird mit einem
 zweiten gekreuzt, jeder Name besteht aus je einem Wort beider Themen (`Snowdon Lepus`,
-`Fomalhaut Lhotse`). Jedes Wort kommt pro Stapel höchstens einmal vor.
+`Fomalhaut Lhotse`). Jedes Wort kommt pro Stapel höchstens einmal vor. Themen der anderen
+Sprache gehen auch, sie tragen in der Liste ihr Sprachkürzel (`Constellations (EN)`).
 
 **Variieren:** `w` hält das Wort des markierten Treffers und würfelt neue Zusätze
 (`Starke Viper` -> `Viper Wächter`), `m` hält den Zusatz und wechselt das Wort
 (`Starke Viper` -> `Starker Aal`, `Starkes Murmeltier`, richtig gebeugt). Aus einer Variante
 heraus geht es mit `w`/`m` weiter, `r` würfelt neu, ein Eintrag in der Themenliste führt
 zurück.
+
+**Methoden** (Leiste über der Liste): *Theme words* ist das bisherige Verfahren. *Coined
+words* erfindet neue Wörter im Klang des Themas (`Lintora`, `Nories`), ein Mix-Partner
+bringt seinen Klang dazu. *Blends* verschmelzen zwei Themenwörter an einem gemeinsamen
+Buchstaben (`Orion` + `Taurus` = `Orisker`), mit Mix-Partner kommt die hintere Hälfte aus
+dem zweiten Thema. *Acronym* nimmt bis zu drei Buchstaben, jedes Wort des Namens beginnt
+mit seinem (`SM` -> `Silent Marten`). Kunst- und Kofferwörter bekommen Zusätze wie jedes
+Themenwort.
+
+**Ton** beschränkt die Zusätze auf eine Stimmung: düster, hell, edel, schnell, ruhig oder
+wild (*Dark*, *Bright*, *Noble*, *Swift*, *Calm*, *Fierce*). **Filter:** *Starts with*,
+eine Silbengrenze und *Alliteration* - die Zusätze werden dann gleich mit dem
+Anfangsbuchstaben des Themenworts gezogen, nicht nur ausgesiebt. *Sort by sound* stellt die
+am besten klingenden Namen nach vorn, die Spalte *Sound* zeigt den Wert (0-100: kurz, gut
+sprechbar, leicht zu buchstabieren). Mit Filter wird ein größerer Vorrat gezogen, die
+Infozeile sagt, wenn weniger Namen durchkommen. `Esc` in einem Textfeld führt zurück zur
+Liste.
 
 Das linke Einstellungspanel hat drei Schieberegler - **Mutationswahrscheinlichkeit**
 (0-100%), **Wortanzahl** (1, 2 oder 3 sichtbare Wörter pro Name) und
@@ -99,8 +117,8 @@ beginnt mit einem **Favorites**-Eintrag — wählst du ihn, erscheinen rechts
 deine gespeicherten Favoriten, wo nur der Mutations-Regler wirkt und sie live
 neu mutiert. Wird mit 35+ Farb-Themes ausgeliefert (Textual-Builtins plus
 Retro-Paletten) — wechseln mit `t` oder dem Ctrl+P-Theme-Picker. Gewähltes
-Farb-Theme, Mutationswahrscheinlichkeit, Wortanzahl, Vorschlagsanzahl und
-Favoriten werden in `~/.codename-generator/settings.json` über Neustarts
+Farb-Theme, Mutationswahrscheinlichkeit, Wortanzahl, Vorschlagsanzahl, Methode,
+Ton, Filter und Favoriten werden in `~/.codename-generator/settings.json` über Neustarts
 hinweg gespeichert.
 
 ### CLI
@@ -117,7 +135,19 @@ uv run codename -t swatch --lang de      # Eigennamen, deutsche Modifikatoren
 uv run codename -w Sitemap              # eigenes Wort mit Zusätzen
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
 uv run codename -t whisky --mix constellations   # Snowdon Lepus ...
+uv run codename -t animals --tone dark                     # nur düstere Zusätze
+uv run codename -t whisky --method coined --words 1        # Lintora, Nories ...
+uv run codename -t whisky --mix constellations --method blend --words 1
+uv run codename -t animals --method acronym --letters SM   # Silent Marten ...
+uv run codename -t animals --initial s --max-syllables 3 --alliteration --sort
+uv run codename --export-favorites favoriten.json          # für die Webfassung
+uv run codename --import-favorites favoriten.json          # Web-Export oder settings.json
 ```
+
+**Favoriten zwischen TUI und Web:** Beide nutzen dasselbe Format. `--export-favorites`
+schreibt eine Datei, die die Webfassung importiert (*Importieren* in ihrer Merkliste), ihr
+*Exportieren* kommt mit `--import-favorites` zurück. Auch eine `settings.json` taugt als
+Importdatei. Bekannte Namen werden übersprungen.
 
 Ein `*` neben einem Vorschlag bedeutet, dass eine phonetische Mutation angewendet wurde
 (`Pegasus -> Pegasos`, `Carnation -> Carnatiyn`, `Frankel -> Frankil`).
@@ -133,6 +163,10 @@ words:
   - Word1
   - Word2
 ```
+
+Die Zusatzlisten unter `data/modifiers/<sprache>/` tragen eine `tones:`-Abbildung (Ton ->
+Wörter). Ein Wort darf mehrere Töne haben oder keinen, jedes Wort dort muss auch in `words`
+stehen - der Loader lehnt alles andere ab.
 
 ## Sprachen
 

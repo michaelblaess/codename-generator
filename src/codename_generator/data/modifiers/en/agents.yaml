@@ -118,3 +118,34 @@ words:
   - shuttle
   - cruiser
   - vessel
+
+# Tonalitaet: welche Woerter zu einem Ton passen. Ein Wort darf mehrere Toene
+# tragen oder keinen. Jedes Wort hier muss oben in `words` stehen.
+tones:
+  dark: [
+    hunter, sentinel, warden, oracle, diviner, rogue, bandit, daemon, drone, agent,
+    proxy, sniffer, prober, lookout, sentry, watcher, tracker, scout, keeper
+  ]
+  bright: [
+    beacon, lantern, herald, messenger, composer, maker, crafter, pioneer, explorer,
+    voyager, rocket, shuttle, bot, tutor, mentor, apprentice, gatherer, harvester
+  ]
+  noble: [
+    guardian, keeper, sage, scholar, master, paladin, knight, templar, champion,
+    architect, curator, oracle, herald, navigator, pilot, smith, wright, scribe,
+    mentor, sculptor, cartographer, composer
+  ]
+  swift: [
+    runner, racer, rider, courier, chaser, drifter, pilot, scout, dispatcher, router,
+    relay, rocket, shuttle, cruiser, launcher, crawler, sweeper, messenger, drone,
+    dynamo, turbine
+  ]
+  calm: [
+    keeper, gatherer, collector, sorter, indexer, curator, scribe, sage, mentor, tutor,
+    reader, wanderer, lantern, compass, mapper, harvester, vessel, bridge
+  ]
+  fierce: [
+    hunter, forge, foundry, reactor, engine, turbine, press, boiler, bandit, rogue,
+    duelist, champion, knight, paladin, templar, chaser, racer, sniffer, warden,
+    sentinel
+  ]

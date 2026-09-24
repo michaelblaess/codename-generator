@@ -77,12 +77,27 @@ stays as typed. A fixed position or a partner theme sets the name to two words.
 
 **Theme mix** (*Mix with* in the settings panel): the active theme is crossed with a
 second one, every name takes one word from each (`Snowdon Lepus`, `Fomalhaut
-Lhotse`). No word appears twice in a batch.
+Lhotse`). No word appears twice in a batch. Themes of the other language work too, they
+carry their language code in the list (`Tierwelt (DE)`).
 
 **Varying:** `w` keeps the word of the highlighted suggestion and rolls new modifiers
 (`Silent Falcon` -> `Falcon Runner`), `m` keeps the modifier and swaps the word
 (`Silent Falcon` -> `Silent Otter`, `Silent Lynx`; German inflects it per gender). From a
 variant, `w`/`m` go on from there, `r` rerolls, picking a theme in the list goes back.
+
+**Methods** (bar above the list): *Theme words* is the classic way. *Coined words* invents
+new words that sound like the theme (`Lintora`, `Nories`), a mix partner adds its sound.
+*Blends* melt two theme words at a shared letter (`Orion` + `Taurus` = `Orisker`), with a
+mix partner the back half comes from the second theme. *Acronym* takes up to three letters,
+every word of the name starts with its letter (`SM` -> `Silent Marten`). Coined words and
+blends take modifiers like any theme word.
+
+**Tone** limits the modifiers to one mood: dark, bright, noble, swift, calm or fierce.
+**Filters:** *Starts with*, a syllable limit and *Alliteration* - the modifiers are then
+drawn with the initial of the theme word, not just filtered. *Sort by sound* puts the
+best-sounding names first, the *Sound* column shows the score (0-100: short, easy to say
+and to spell). With a filter a larger pool is drawn, the info line says when fewer names
+pass. `Esc` in a text field returns to the list.
 
 The left settings panel has three sliders - **mutation chance** (0-100%),
 **word count** (1, 2 or 3 visible words per name) and **suggestions**
@@ -96,8 +111,8 @@ regenerate). The theme list starts with a **Favorites** entry — selecting it
 lists your saved favorites on the right, where only the mutation slider
 applies and re-mutates them live. Ships with 35+ colour themes (Textual
 built-ins plus retro palettes) — switch with `t` or the Ctrl+P theme picker.
-Chosen colour theme, mutation chance, word count, suggestion count and
-favorites are persisted to `~/.codename-generator/settings.json` across
+Chosen colour theme, mutation chance, word count, suggestion count, method,
+tone, filters and favorites are persisted to `~/.codename-generator/settings.json` across
 restarts.
 
 ### CLI
@@ -114,7 +129,18 @@ uv run codename -t swatch --lang de      # proper names, German modifiers
 uv run codename -w Sitemap              # your own word with modifiers
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
 uv run codename -t whisky --mix constellations   # Snowdon Lepus ...
+uv run codename -t animals --tone dark                     # only dark modifiers
+uv run codename -t whisky --method coined --words 1        # Lintora, Nories ...
+uv run codename -t whisky --mix constellations --method blend --words 1
+uv run codename -t animals --method acronym --letters SM   # Silent Marten ...
+uv run codename -t animals --initial s --max-syllables 3 --alliteration --sort
+uv run codename --export-favorites favorites.json          # for the web version
+uv run codename --import-favorites favorites.json          # web export or settings.json
 ```
+
+**Favorites between TUI and web:** both use the same format. `--export-favorites` writes
+a file the web version imports (*Import* in its list), the web's *Export* goes back in with
+`--import-favorites`. A `settings.json` works as import file, too. Known names are skipped.
 
 A `*` next to a suggestion means a phonetic mutation was applied
 (`Pegasus -> Pegasos`, `Carnation -> Carnatiyn`, `Frankel -> Frankil`).
@@ -130,6 +156,10 @@ words:
   - Word1
   - Word2
 ```
+
+The modifier lists under `data/modifiers/<lang>/` carry a `tones:` map (tone -> words). A
+word may have several tones or none, every word there must also be in `words` - the loader
+refuses anything else.
 
 ## Languages
 

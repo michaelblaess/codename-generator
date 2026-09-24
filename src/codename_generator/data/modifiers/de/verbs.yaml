@@ -92,3 +92,34 @@ words:
   - dampfend
   - qualmend
   - tobend
+
+# Tonalitaet: welche Woerter zu einem Ton passen. Ein Wort darf mehrere Toene
+# tragen oder keinen. Jedes Wort hier muss oben in `words` stehen.
+tones:
+  dark: [
+    lauernd, schleichend, spähend, witternd, schweigend, flüsternd, raunend, wachend,
+    wartend, suchend, grabend, qualmend, welkend, glimmend, folgend
+  ]
+  bright: [
+    leuchtend, funkelnd, schimmernd, blitzend, singend, klingend, blühend, wachsend,
+    springend, glühend, flackernd, summend, fliegend, blendend
+  ]
+  noble: [
+    schützend, hütend, führend, weisend, dienend, tragend, bergend, schmiedend, bauend,
+    webend, wachend, reifend, wandelnd, werdend, hallend
+  ]
+  swift: [
+    jagend, laufend, eilend, springend, fliegend, stürzend, gleitend, kreisend,
+    wirbelnd, treibend, drängend, blitzend, stürmend, stiebend, wehend, ziehend,
+    tauchend
+  ]
+  calm: [
+    schwebend, gleitend, treibend, wandernd, streifend, wartend, rauschend, summend,
+    flüsternd, schweigend, reifend, blühend, tropfend, tauend, wehend, pflügend,
+    webend, kehrend
+  ]
+  fierce: [
+    schlagend, reißend, beißend, stechend, packend, ringend, stürmend, brechend,
+    splitternd, sprengend, lodernd, donnernd, dröhnend, tobend, jagend, brennend,
+    drängend
+  ]

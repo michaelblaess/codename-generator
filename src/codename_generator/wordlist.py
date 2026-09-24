@@ -22,6 +22,10 @@ NEUTRAL_LANGUAGE = "neutral"
 _GENDER_SEPARATOR = "|"
 _VALID_GENDERS = frozenset({"m", "f", "n", "p"})
 
+# Toene, mit denen Modifier markiert werden (`tones:` im YAML). Die Reihenfolge
+# ist die Anzeige-Reihenfolge in TUI und Web.
+TONES: tuple[str, ...] = ("dark", "bright", "noble", "swift", "calm", "fierce")
+
 
 @dataclass(frozen=True)
 class WordList:
@@ -41,6 +45,16 @@ class WordList:
     language: str = DEFAULT_LANGUAGE
     # genders: parallel zu `words`, leerer String wenn ein Wort kein Genus hat.
     genders: tuple[str, ...] = field(default_factory=tuple)
+    # tones: Ton -> Woerter dieses Tons, als Paare, damit die Klasse hashbar bleibt.
+    tones: tuple[tuple[str, tuple[str, ...]], ...] = field(default_factory=tuple)
+
+    def words_for_tone(self, tone: str) -> tuple[str, ...]:
+        """Woerter mit diesem Ton, in der Reihenfolge von `words` (leer wenn keins)."""
+        tagged = next((words for name, words in self.tones if name == tone), ())
+        if not tagged:
+            return ()
+        wanted = set(tagged)
+        return tuple(word for word in self.words if word in wanted)
 
     def gender_of(self, word: str) -> str:
         """Liefert das Genus eines Theme-Worts (leer wenn unbekannt)."""
@@ -94,6 +108,34 @@ def _parse_words(raw: object, path: Path) -> _ParsedWords:
     )
 
 
+def _parse_tones(
+    raw: object, words: tuple[str, ...], path: Path
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Liest die `tones`-Abbildung und prueft sie gegen die Wortliste.
+
+    Ein unbekannter Ton oder ein Wort, das nicht in `words` steht, ist ein
+    Pflegefehler - der faellt beim Laden auf, nicht erst als leerer Filter.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict):
+        raise ValueError(f"'tones' must be a mapping in {path}")
+    known = set(words)
+    result: list[tuple[str, tuple[str, ...]]] = []
+    for tone in TONES:
+        if tone not in raw:
+            continue
+        tagged = _str_tuple(raw[tone])
+        unknown = [word for word in tagged if word not in known]
+        if unknown:
+            raise ValueError(f"tone '{tone}' in {path} names unknown words: {unknown}")
+        result.append((tone, tagged))
+    extra = sorted(str(key) for key in raw if key not in TONES)
+    if extra:
+        raise ValueError(f"unknown tones in {path}: {extra}")
+    return tuple(result)
+
+
 def _wordlist_from_path(path: Path, language: str = DEFAULT_LANGUAGE) -> WordList:
     data = _load_yaml(path)
     parsed = _parse_words(data.get("words", []), path)
@@ -109,6 +151,7 @@ def _wordlist_from_path(path: Path, language: str = DEFAULT_LANGUAGE) -> WordLis
         default_mutation=_optional_int(data.get("default_mutation")),
         language=str(data.get("language", language)),
         genders=parsed.genders,
+        tones=_parse_tones(data.get("tones"), parsed.words, path),
     )
 
 

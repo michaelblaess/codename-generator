@@ -109,3 +109,32 @@ words:
   - flackernd
   - glühend
   - brennend
+
+# Tonalitaet: welche Woerter zu einem Ton passen. Ein Wort darf mehrere Toene
+# tragen oder keinen. Jedes Wort hier muss oben in `words` stehen.
+tones:
+  dark: [
+    dunkel, finster, schattig, trübe, nebelig, rußig, heimlich, verborgen, geheim,
+    unsichtbar, lautlos, grimmig, einsam, abgelegen, tief, fern, still, kalt, eisig
+  ]
+  bright: [
+    hell, licht, blank, gläsern, golden, silbern, klar, rein, frisch, jung, froh,
+    munter, glühend, flackernd, luftig, offen
+  ]
+  noble: [
+    edel, erhaben, hehr, heilig, sagenhaft, ewig, uralt, alt, golden, silbern, ehern,
+    kupfern, purpurn, stolz, treu, streng, klug, unbeugsam, rein
+  ]
+  swift: [
+    schnell, flink, hurtig, rasch, jäh, wendig, ruhelos, rastlos, hitzig, scharf,
+    spitz, schneidend, munter, luftig, wachsam
+  ]
+  calm: [
+    still, leis, ruhig, sanft, sacht, lautlos, geduldig, unbeirrt, schlicht, klar,
+    rein, weit, endlos, tief, offen, einsam, luftig, blaugrau
+  ]
+  fierce: [
+    stark, hart, zäh, wuchtig, trotzig, kühn, wagemutig, unbezwingbar, wild, roh, rau,
+    schroff, grimmig, zornig, hitzig, gierig, hungrig, brennend, glühend, klirrend,
+    eisig, scharf, dornig, steinig, karg
+  ]

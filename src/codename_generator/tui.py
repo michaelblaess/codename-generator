@@ -14,9 +14,11 @@ from textual.events import Click, Mount
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.widgets import (
+    Checkbox,
     DataTable,
     Footer,
     Header,
+    Input,
     ListItem,
     ListView,
     RichLog,
@@ -37,20 +39,27 @@ from textual_widgets import (
 from textual_widgets.keymap import KeyBinding, KeymapProblem
 
 from codename_generator import __author__, __version__, __year__, keymap
+from codename_generator.favorites import favorite_to_dict, parse_favorites
 from codename_generator.generator import (
     CUSTOM_SEED_SLUG,
+    FILTER_POOL_FACTOR,
     RANDOM_THEME_SLUG,
     AnchorPosition,
     Generator,
+    Method,
     Pattern,
+    PresentOptions,
     Recipe,
+    StackRequest,
     Suggestion,
     VariantKeep,
+    normalize_letters,
 )
 from codename_generator.keymap_screen import KeymapScreen
+from codename_generator.scoring import NameFilter, sound_score
 from codename_generator.settings import JsonSettingsStore
 from codename_generator.settings_screen import CodenameSettingsScreen
-from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE, WordList
+from codename_generator.wordlist import DEFAULT_LANGUAGE, NEUTRAL_LANGUAGE, TONES, WordList
 
 # Auswahlwert "kein Partner-Thema" - der Custom Seed zieht dann Adjektive und
 # Verben. Ein leerer String taugt nicht, Select behandelt ihn wie "nichts".
@@ -70,6 +79,34 @@ SEED_POSITION_LABELS: dict[AnchorPosition, str] = {
 
 # Anzeigenamen der Sprachen - Endonyme, damit jeder seine eigene wiedererkennt.
 LANGUAGE_LABELS: dict[str, str] = {"en": "English", "de": "Deutsch"}
+
+METHOD_LABELS: dict[Method, str] = {
+    Method.WORDS: "Theme words",
+    Method.COINED: "Coined words",
+    Method.BLEND: "Blends",
+    Method.ACRONYM: "Acronym",
+}
+
+# Auswahlwert "kein Ton" - Select braucht einen nicht-leeren Wert.
+TONE_ANY = "__any__"
+TONE_LABELS: dict[str, str] = {
+    "dark": "Dark",
+    "bright": "Bright",
+    "noble": "Noble",
+    "swift": "Swift",
+    "calm": "Calm",
+    "fierce": "Fierce",
+}
+
+# Silbengrenze als String - on_select_changed wertet nur Strings aus.
+SYLLABLE_OPTIONS: list[tuple[str, str]] = [
+    ("Any length", "0"),
+    ("Max 2 syllables", "2"),
+    ("Max 3 syllables", "3"),
+    ("Max 4 syllables", "4"),
+    ("Max 5 syllables", "5"),
+]
+_SYLLABLE_VALUES = frozenset(int(value) for _, value in SYLLABLE_OPTIONS)
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
@@ -120,6 +157,21 @@ class SuggestionsTable(DataTable[str]):
             event.stop()
             return
         await super()._on_click(event)
+
+
+class BarInput(Input):
+    """Eingabefeld der Methodenleiste - Esc gibt den Fokus an die Vorschlagsliste zurueck.
+
+    Solange ein Textfeld den Fokus hat, tippen Buchstaben Text statt Befehle
+    auszuloesen. Esc ist der Weg zurueck, damit der Footer wieder voll ist.
+    """
+
+    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
+        Binding("escape", "leave", "Back to list", show=False),
+    ]
+
+    def action_leave(self) -> None:
+        self.app.query_one("#suggestions", DataTable).focus()
 
 
 class FavoritesScreen(ModalScreen[None]):
@@ -212,6 +264,31 @@ class CodenameApp(App[None]):
     #suggestions {
         height: 1fr;
     }
+    #method-bar {
+        height: 1;
+        margin: 1 0;
+    }
+    #method-bar > * {
+        margin-right: 2;
+    }
+    #method-select {
+        width: 18;
+    }
+    #tone-select {
+        width: 14;
+    }
+    #syllable-select {
+        width: 19;
+    }
+    #letters-input {
+        width: 10;
+    }
+    #initial-input {
+        width: 13;
+    }
+    #letters-input.hidden {
+        display: none;
+    }
     #log {
         height: 6;
         background: $boost;
@@ -258,6 +335,11 @@ class CodenameApp(App[None]):
         self._variant_base: Recipe | None = None
         self._variant_keep = VariantKeep.WORD
         self._variant_name = ""
+        # Virtuelle Themes je Stapel (Kunstwoerter, Kofferwoerter, Akronym, Mix) -
+        # sie entstehen mit ihren Recipes und muessen mit ihnen zusammenbleiben.
+        self._stack_themes: dict[str, WordList] = {}
+        # Recipes in der angezeigten Reihenfolge (nach Filter und Sortierung).
+        self._shown_recipes: list[Recipe] = []
 
         settings = self._settings_store.load()
         self.mutation_percent = self._coerce_mutation(settings.get("mutation_percent"))
@@ -272,6 +354,16 @@ class CodenameApp(App[None]):
         partner = str(settings.get("seed_partner", ""))
         self._seed_partner = partner if partner in self.generator.themes else ""
         self._seed_position = self._coerce_position(settings.get("seed_position"))
+        self._method = self._coerce_method(settings.get("method"))
+        self._letters = normalize_letters(str(settings.get("acronym_letters", "")))
+        tone = str(settings.get("tone", ""))
+        self._tone = tone if tone in TONES else ""
+        self._name_filter = NameFilter(
+            initial=self._clean_initial(str(settings.get("filter_initial", ""))),
+            max_syllables=self._coerce_syllables(settings.get("filter_max_syllables")),
+            alliteration=bool(settings.get("filter_alliteration", False)),
+        )
+        self._sort_by_score = bool(settings.get("sort_by_score", False))
         # Tastenbelegung aus den Einstellungen. Beanstandungen gehoeren ins
         # Log, das gibt es beim Binden aber noch nicht - also erst in on_mount.
         self._vim_navigation = bool(settings.get("keymap_vim", False))
@@ -283,6 +375,28 @@ class CodenameApp(App[None]):
         visible = self._visible_theme_slugs()
         if self.theme_slug not in visible:
             self.theme_slug = visible[0] if visible else ""
+
+    @staticmethod
+    def _coerce_method(raw: object) -> Method:
+        """Uebernimmt eine gespeicherte Methode, sonst Theme-Woerter."""
+        try:
+            return Method(str(raw))
+        except ValueError:
+            return Method.WORDS
+
+    @staticmethod
+    def _coerce_syllables(raw: object) -> int:
+        """Silbengrenze aus den Einstellungen - nur Werte, die die Auswahl kennt."""
+        try:
+            value = int(str(raw))
+        except ValueError:
+            return 0
+        return value if value in _SYLLABLE_VALUES else 0
+
+    @staticmethod
+    def _clean_initial(raw: str) -> str:
+        """Anfangsbuchstaben fuer den Filter: nur Buchstaben, klein, hoechstens drei."""
+        return "".join(ch for ch in raw.lower() if ch.isalpha())[:3]
 
     @staticmethod
     def _coerce_position(raw: object) -> AnchorPosition:
@@ -340,37 +454,11 @@ class CodenameApp(App[None]):
 
     @staticmethod
     def _deserialize_favorites(raw: object) -> list[Suggestion]:
-        if not isinstance(raw, list):
-            return []
-        result: list[Suggestion] = []
-        for item in raw:
-            if not isinstance(item, dict):
-                continue
-            try:
-                result.append(
-                    Suggestion(
-                        name=str(item["name"]),
-                        slug=str(item["slug"]),
-                        pattern=Pattern(str(item["pattern"])),
-                        mutated=bool(item["mutated"]),
-                        source_words=tuple(str(w) for w in item["source_words"]),
-                    )
-                )
-            except (KeyError, ValueError, TypeError):
-                continue
-        return result
+        # Dasselbe Format wie der Austausch mit dem Web (favorites.py).
+        return parse_favorites(raw if isinstance(raw, list) else [])
 
     def _serialize_favorites(self) -> list[dict[str, object]]:
-        return [
-            {
-                "name": f.name,
-                "slug": f.slug,
-                "pattern": f.pattern.value,
-                "mutated": f.mutated,
-                "source_words": list(f.source_words),
-            }
-            for f in self.favorites
-        ]
+        return [favorite_to_dict(f) for f in self.favorites]
 
     def _save_settings(self) -> None:
         # Zusammenfuehren statt ueberschreiben: sonst verschwinden Schluessel,
@@ -389,6 +477,13 @@ class CodenameApp(App[None]):
                 "mix_partner": self._mix_partner,
                 "seed_position": self._seed_position.value,
                 "language": self.content_language,
+                "method": self._method.value,
+                "acronym_letters": self._letters,
+                "tone": self._tone,
+                "filter_initial": self._name_filter.initial,
+                "filter_max_syllables": self._name_filter.max_syllables,
+                "filter_alliteration": self._name_filter.alliteration,
+                "sort_by_score": self._sort_by_score,
             }
         )
         self._settings_store.save(data)
@@ -427,7 +522,13 @@ class CodenameApp(App[None]):
         with Horizontal(id="main"):
             with Vertical(id="themes-pane"):
                 yield Static(self._themes_title(), id="themes-title")
-                yield ListView(*self._theme_items(), id="theme-list")
+                # Start direkt auf dem aktiven Theme: ein Start auf Index 0 meldete
+                # sonst kurz die Favoriten ("viewing favorites" im Log).
+                yield ListView(
+                    *self._theme_items(),
+                    id="theme-list",
+                    initial_index=self._list_index_of_theme(),
+                )
                 yield HorizontalSplitter(target_id="theme-list", min_size=6)
                 with Vertical(id="settings-pane"):
                     yield Static("Settings", id="settings-title")
@@ -494,25 +595,95 @@ class CodenameApp(App[None]):
             yield VerticalSplitter(target_id="themes-pane", min_size=16, max_size=60)
             with Vertical(id="right-pane"):
                 yield Static(id="info")
+                yield from self._compose_method_bar()
                 table: SuggestionsTable = SuggestionsTable(
                     cursor_type="row",
                     zebra_stripes=True,
                     id="suggestions",
                 )
-                table.add_columns("#", "Name", "Slug", "Pattern", "*")
+                table.add_columns("#", "Name", "Slug", "Pattern", "Sound", "*")
                 yield table
                 yield HorizontalSplitter(target_id="suggestions", min_size=6)
                 yield RichLog(id="log", wrap=False, highlight=True, markup=True)
         yield Footer()
+
+    def _compose_method_bar(self) -> ComposeResult:
+        """Leiste ueber der Liste: Methode, Akronym, Ton, Filter und Sortierung."""
+        with Horizontal(id="method-bar"):
+            method = Select(
+                [(label, m.value) for m, label in METHOD_LABELS.items()],
+                value=self._method.value,
+                allow_blank=False,
+                compact=True,
+                id="method-select",
+            )
+            method.tooltip = (
+                "How names are made: theme words with modifiers, coined words that sound "
+                "like the theme, blends of two theme words, or an acronym"
+            )
+            yield method
+            letters = BarInput(
+                value=self._letters.upper(),
+                placeholder="Letters",
+                max_length=3,
+                compact=True,
+                id="letters-input",
+                classes="" if self._method == Method.ACRONYM else "hidden",
+            )
+            letters.tooltip = "Up to three letters - every word of the name starts with its letter"
+            yield letters
+            tone = Select(
+                [("Any tone", TONE_ANY), *((TONE_LABELS[t], t) for t in TONES)],
+                value=self._tone or TONE_ANY,
+                allow_blank=False,
+                compact=True,
+                id="tone-select",
+            )
+            tone.tooltip = "Only modifiers of this mood, e.g. dark or calm"
+            yield tone
+            initial = BarInput(
+                value=self._name_filter.initial.upper(),
+                placeholder="Starts with",
+                max_length=3,
+                compact=True,
+                id="initial-input",
+            )
+            initial.tooltip = "Only names that start with these letters"
+            yield initial
+            syllables = Select(
+                SYLLABLE_OPTIONS,
+                value=str(self._name_filter.max_syllables),
+                allow_blank=False,
+                compact=True,
+                id="syllable-select",
+            )
+            syllables.tooltip = "Only names with at most this many syllables"
+            yield syllables
+            yield Checkbox(
+                "Alliteration",
+                value=self._name_filter.alliteration,
+                compact=True,
+                id="alliteration-check",
+                tooltip="Only names whose words start with the same letter",
+            )
+            yield Checkbox(
+                "Sort by sound",
+                value=self._sort_by_score,
+                compact=True,
+                id="sort-check",
+                tooltip="Best sounding first: short, easy to say and to spell",
+            )
+
+    def _list_index_of_theme(self) -> int:
+        """Listenindex des aktiven Themes - 0/1 sind Favorites und Custom Seed."""
+        visible = self._visible_theme_slugs()
+        return 2 + visible.index(self.theme_slug) if self.theme_slug in visible else 2
 
     def on_mount(self) -> None:
         if self._startup_theme in self.available_themes:
             self.theme = self._startup_theme
         self.title = "codename-generator"
         self.sub_title = self.theme_slug
-        list_view = self.query_one("#theme-list", ListView)
-        # Indizes 0/1 sind Favorites/Custom Seed - Start auf dem ersten echten Theme.
-        list_view.index = 2
         self._log_event(f"started - theme [b]{self.theme_slug}[/b]")
         self._log_keymap_problems()
         self._ensure_recipes()
@@ -546,7 +717,7 @@ class CodenameApp(App[None]):
         else:
             info.update(
                 f"[b]{theme.name}[/b]  [dim]{theme.description}[/dim]   "
-                f"favorites: [b]{len(self.favorites)}[/b]"
+                f"favorites: [b]{len(self.favorites)}[/b]{self._shown_note()}"
             )
 
         # Themes mit eigenen Patterns / mutate=false machen die Slider wirkungslos.
@@ -576,6 +747,13 @@ class CodenameApp(App[None]):
         count_label.set_class(False, "locked")
         count_label.update(f"Suggestions: [b]{self.suggestion_count}[/b]")
 
+    def _shown_note(self) -> str:
+        """Hinweis, wenn Filter weniger Namen durchlassen als eingestellt."""
+        shown = len(self.suggestions)
+        if not self._name_filter.active or shown >= self.suggestion_count:
+            return ""
+        return f"   [dim]filters: {shown} of {self.suggestion_count}[/dim]"
+
     def _partner_options(self) -> list[tuple[str, str]]:
         """Auswahl fuer den Partner des Custom Seed: Zusaetze oder ein sichtbares Theme."""
         options = [("Adjectives & verbs", SEED_PARTNER_MODIFIERS)]
@@ -602,15 +780,22 @@ class CodenameApp(App[None]):
             return self.generator.generate_anchored_recipes(
                 self._custom_seed,
                 self.generator.themes[self._seed_partner],
-                count=self.suggestion_count,
+                count=self._pool_count(),
                 position=self._seed_position,
             )
         return self.generator.generate_seeded_recipes(
             self._custom_seed,
-            count=self.suggestion_count,
+            count=self._pool_count(),
             language=self.content_language,
             position=self._seed_position,
+            tone=self._tone,
+            alliterate=self._name_filter.alliteration,
         )
+
+    def _pool_count(self) -> int:
+        """Wie viele Recipes ein Stapel zieht - mit Filter ein groesserer Vorrat."""
+        factor = FILTER_POOL_FACTOR if self._name_filter.active else 1
+        return self.suggestion_count * factor
 
     def _update_seed_info(self) -> None:
         """Info-Zeile und Slider-Status fuer die Custom-Seed-Ansicht.
@@ -673,7 +858,7 @@ class CodenameApp(App[None]):
     def _ensure_recipes(self) -> None:
         """Erzeugt Recipes fuer das aktuelle Theme, falls noch keine im Cache."""
         if self.theme_slug and self._theme_key() not in self._recipes:
-            self._recipes[self._theme_key()] = self._theme_recipes()
+            self._build_theme_stack()
 
     def _ensure_seed_recipes(self) -> None:
         """Erzeugt Recipes fuer den aktuellen Custom-Seed, falls noch keine im Cache."""
@@ -689,7 +874,7 @@ class CodenameApp(App[None]):
             self._recipes[CUSTOM_SEED_SLUG] = self._seed_recipes()
             return
         if self.theme_slug:
-            self._recipes[self._theme_key()] = self._theme_recipes()
+            self._build_theme_stack()
 
     def _rerender(self) -> None:
         """Rendert die vorhandenen Recipes mit aktueller Mutation/Wortzahl neu.
@@ -706,22 +891,8 @@ class CodenameApp(App[None]):
         if not self.theme_slug:
             return
         theme = self._current_theme()
-        mutation = self.mutation_percent / 100.0
         recipes = self._recipes.get(VARIANT_KEY if self._variant_mode else self._theme_key(), [])
-        self.suggestions = [
-            self.generator.render(r, theme, self.word_count, mutation, self.content_language)
-            for r in recipes
-        ]
-        table = self.query_one("#suggestions", DataTable)
-        table.clear()
-        for i, s in enumerate(self.suggestions, 1):
-            table.add_row(
-                str(i),
-                s.name,
-                s.slug,
-                s.pattern.value,
-                "*" if s.mutated else "",
-            )
+        self._show(recipes, theme, self._empty_text())
         self._update_info()
 
     def _render_seeded(self) -> None:
@@ -729,42 +900,67 @@ class CodenameApp(App[None]):
         if not self._custom_seed:
             return
         theme = self._seed_theme()
-        mutation = self.mutation_percent / 100.0
         recipes = self._recipes.get(CUSTOM_SEED_SLUG, [])
-        self.suggestions = [
-            self.generator.render(r, theme, self.word_count, mutation, self.content_language)
-            for r in recipes
-        ]
+        empty = (
+            "(no name passes the filters)"
+            if recipes
+            else f"(no seed yet - press {self._key_hint('edit_seed')})"
+        )
+        self._show(recipes, theme, empty)
+        self._update_info()
+
+    def _show(self, recipes: list[Recipe], theme: WordList, empty_text: str) -> None:
+        """Rendert Recipes mit Filter und Sortierung in die Tabelle."""
+        options = PresentOptions(
+            word_count=self.word_count,
+            mutation_chance=self.mutation_percent / 100.0,
+            language=self.content_language,
+            name_filter=self._name_filter,
+            sort_by_score=self._sort_by_score,
+            limit=self.suggestion_count,
+        )
+        shown = self.generator.present(recipes, theme, options)
+        self._shown_recipes = [item.recipe for item in shown]
+        self.suggestions = [item.suggestion for item in shown]
         table = self.query_one("#suggestions", DataTable)
         table.clear()
-        if not self.suggestions:
-            table.add_row("", f"(no seed yet - press {self._key_hint('edit_seed')})", "", "", "")
-        else:
-            for i, s in enumerate(self.suggestions, 1):
-                table.add_row(
-                    str(i),
-                    s.name,
-                    s.slug,
-                    s.pattern.value,
-                    "*" if s.mutated else "",
-                )
-        self._update_info()
+        if not shown:
+            table.add_row("", empty_text, "", "", "", "")
+            return
+        for i, item in enumerate(shown, 1):
+            s = item.suggestion
+            table.add_row(
+                str(i), s.name, s.slug, s.pattern.value, str(item.score), "*" if s.mutated else ""
+            )
+
+    def _empty_text(self) -> str:
+        """Was in einer leeren Liste steht - je nach Grund."""
+        if self._method == Method.ACRONYM and not self._letters:
+            return "(type up to three letters for the acronym)"
+        if self._method == Method.ACRONYM and not self._current_theme().patterns:
+            return "(no words for these letters in this theme)"
+        if self._recipes.get(self._theme_key()):
+            return "(no name passes the filters)"
+        return "(nothing to show for this theme)"
 
     def _render_favorites(self) -> None:
         """Zeigt die gespeicherten Favoriten rechts an - mit aktueller Mutation."""
         mutation = self.mutation_percent / 100.0
         self.suggestions = [self.generator.render_favorite(fav, mutation) for fav in self.favorites]
+        self._shown_recipes = []
         table = self.query_one("#suggestions", DataTable)
         table.clear()
         if not self.suggestions:
-            table.add_row("", "(no favorites yet)", "", "", "")
+            table.add_row("", "(no favorites yet)", "", "", "", "")
         else:
             for i, s in enumerate(self.suggestions, 1):
+                score = sound_score(s.name, self.content_language)
                 table.add_row(
                     str(i),
                     s.name,
                     s.slug,
                     s.pattern.value,
+                    str(score),
                     "*" if s.mutated else "",
                 )
         self._update_info()
@@ -779,36 +975,68 @@ class CodenameApp(App[None]):
         """Ob die Themenansicht gerade zwei Themes kreuzt."""
         return bool(self._mix_partner) and self._mix_partner != self.theme_slug
 
+    def _uses_partner(self) -> bool:
+        """Ob der Mix-Partner in den Stapel eingeht - das Akronym kennt keinen."""
+        return self._mix_active() and self._method != Method.ACRONYM
+
     def _theme_key(self) -> str:
-        """Cache-Schluessel der Themenansicht - je Mix ein eigener Stapel."""
-        return f"{self.theme_slug}+{self._mix_partner}" if self._mix_active() else self.theme_slug
+        """Cache-Schluessel der Themenansicht - je Methode, Mix, Ton und Vorrat ein Stapel."""
+        parts = [self.theme_slug]
+        if self._method != Method.WORDS:
+            parts.append(self._method.value)
+        if self._uses_partner():
+            parts.append(f"+{self._mix_partner}")
+        if self._method == Method.ACRONYM:
+            parts.append(self._letters)
+        if self._tone:
+            parts.append(f"tone={self._tone}")
+        if self._name_filter.active:
+            parts.append("pool")
+        if self._name_filter.alliteration:
+            parts.append("alliterate")
+        return "|".join(parts)
 
     def _theme_view(self) -> WordList:
-        """Das Theme der Themenansicht: das gewaehlte, oder gekreuzt mit dem Mix-Partner."""
-        base = self.generator.themes[self.theme_slug]
-        if not self._mix_active():
-            return base
-        return self.generator.crossed_theme(
-            base, self.generator.themes[self._mix_partner], self.content_language
-        )
+        """Das Theme der Themenansicht - bei Methode oder Mix ein virtuelles."""
+        key = self._theme_key()
+        if key not in self._stack_themes:
+            self._build_theme_stack()
+        return self._stack_themes[key]
 
-    def _theme_recipes(self) -> list[Recipe]:
-        """Frische Recipes fuer die Themenansicht, mit oder ohne Mix."""
-        if self._mix_active():
-            return self.generator.generate_crossed_recipes(
-                self.generator.themes[self.theme_slug],
-                self.generator.themes[self._mix_partner],
-                count=self.suggestion_count,
+    def _build_theme_stack(self) -> None:
+        """Erzeugt Theme und Recipes der Themenansicht und legt beide in den Cache."""
+        partner = self.generator.themes[self._mix_partner] if self._uses_partner() else None
+        stack = self.generator.build_stack(
+            StackRequest(
+                theme=self.generator.themes[self.theme_slug],
+                count=self._pool_count(),
+                language=self.content_language,
+                method=self._method,
+                partner=partner,
+                tone=self._tone,
+                letters=self._letters,
+                alliterate=self._name_filter.alliteration,
             )
-        return self.generator.generate_recipes(
-            self.theme_slug, count=self.suggestion_count, language=self.content_language
         )
+        key = self._theme_key()
+        self._stack_themes[key] = stack.theme
+        self._recipes[key] = stack.recipes
 
     def _mix_options(self) -> list[tuple[str, str]]:
-        """Auswahl fuer den Mix: keiner oder ein sichtbares Theme."""
+        """Auswahl fuer den Mix: keiner, die Themes der Sprache, dann die der anderen.
+
+        Ein Mix braucht keine Zusaetze, also auch keine gemeinsame Sprache -
+        "Taurus Falke" geht. Fremdsprachige Themes tragen ihr Kuerzel.
+        """
         options = [("No mix", MIX_NONE)]
-        for slug in self._visible_theme_slugs():
+        visible = self._visible_theme_slugs()
+        for slug in visible:
             options.append((self.generator.themes[slug].name, slug))
+        for slug in self.theme_slugs:
+            theme = self.generator.themes[slug]
+            if slug in visible or slug.startswith(RANDOM_THEME_SLUG):
+                continue
+            options.append((f"{theme.name} ({theme.language.upper()})", slug))
         return options
 
     def action_vary_word(self) -> None:
@@ -828,18 +1056,25 @@ class CodenameApp(App[None]):
             self.notify("Favorites can't be varied - pick a theme", severity="warning")
             return
         if self._seed_mode:
-            key, theme = CUSTOM_SEED_SLUG, self._seed_theme()
+            theme = self._seed_theme()
         elif self._variant_mode and self._variant_theme is not None:
-            key, theme = VARIANT_KEY, self._variant_theme
+            theme = self._variant_theme
         else:
-            key, theme = self._theme_key(), self._theme_view()
-        recipes = self._recipes.get(key, [])
+            theme = self._theme_view()
+        # Die angezeigte Reihenfolge zaehlt, nicht die gezogene - Filter und
+        # Sortierung stellen die Liste um.
+        recipes = self._shown_recipes
         row = self.query_one("#suggestions", DataTable).cursor_row
         if not 0 <= row < len(recipes):
             return
         base = recipes[row]
         variants = self.generator.generate_variant_recipes(
-            base, theme, keep, count=self.suggestion_count, language=self.content_language
+            base,
+            theme,
+            keep,
+            count=self._pool_count(),
+            language=self.content_language,
+            tone=self._tone,
         )
         if not variants:
             self.notify("Nothing to vary here", severity="warning")
@@ -866,8 +1101,9 @@ class CodenameApp(App[None]):
             self._variant_base,
             self._variant_theme,
             self._variant_keep,
-            count=self.suggestion_count,
+            count=self._pool_count(),
             language=self.content_language,
+            tone=self._tone,
         )
 
     def _selected_suggestion(self) -> Suggestion | None:
@@ -1008,6 +1244,9 @@ class CodenameApp(App[None]):
             self._refresh_seed_label()
         self._seed_mode = True
         self._favorites_mode = False
+        self._variant_mode = False
+        # Die Liste links markiert jetzt den Custom Seed statt des alten Themes.
+        self.query_one("#theme-list", ListView).index = 1
         self.sub_title = f"seed: {seed}"
         self._log_event(f"seed -> [b]{seed}[/b]")
         self._save_settings()
@@ -1045,7 +1284,7 @@ class CodenameApp(App[None]):
 
     def action_bump_mutation(self) -> None:
         is_special = self._favorites_mode or self._seed_mode
-        if not is_special and not self.generator.themes[self.theme_slug].mutate:
+        if not is_special and not self._current_theme().mutate:
             self.notify("Mutation is locked for this theme", severity="warning")
             return
         new_value = (self.mutation_percent + self.MUTATION_BUMP) % 105
@@ -1128,6 +1367,93 @@ class CodenameApp(App[None]):
                 return
             self._seed_position = position
             self._apply_seed_change(f"seed position -> [b]{position.value}[/b]")
+        elif event.select.id == "method-select":
+            method = self._coerce_method(event.value)
+            if method == self._method:
+                return
+            self._method = method
+            self.query_one("#letters-input", BarInput).set_class(method != Method.ACRONYM, "hidden")
+            self._apply_view_change(f"method -> [b]{method.value}[/b]")
+            if method == Method.ACRONYM and not self._letters:
+                self.query_one("#letters-input", BarInput).focus()
+        elif event.select.id == "tone-select":
+            tone = "" if event.value == TONE_ANY else event.value
+            if tone == self._tone or (tone and tone not in TONES):
+                return
+            self._tone = tone
+            # Der Seed zieht Zusaetze - mit neuem Ton neue Recipes.
+            self._recipes.pop(CUSTOM_SEED_SLUG, None)
+            self._ensure_seed_recipes()
+            self._apply_view_change(f"tone -> [b]{tone or 'any'}[/b]")
+        elif event.select.id == "syllable-select":
+            syllables = self._coerce_syllables(event.value)
+            if syllables == self._name_filter.max_syllables:
+                return
+            self._set_filter(
+                dataclasses.replace(self._name_filter, max_syllables=syllables),
+                f"max syllables -> [b]{syllables or 'any'}[/b]",
+            )
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Alliteration und Sortierung in der Methodenleiste."""
+        if event.checkbox.id == "alliteration-check":
+            if event.value == self._name_filter.alliteration:
+                return
+            self._set_filter(
+                dataclasses.replace(self._name_filter, alliteration=event.value),
+                f"alliteration -> [b]{'on' if event.value else 'off'}[/b]",
+            )
+        elif event.checkbox.id == "sort-check":
+            if event.value == self._sort_by_score:
+                return
+            self._sort_by_score = event.value
+            self._log_event(f"sort by sound -> [b]{'on' if event.value else 'off'}[/b]")
+            self._save_settings()
+            self._rerender()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Akronym-Buchstaben und Anfangsbuchstaben-Filter, bei jedem Tastendruck."""
+        if event.input.id == "letters-input":
+            letters = normalize_letters(event.value)
+            if letters == self._letters:
+                return
+            self._letters = letters
+            if self._method == Method.ACRONYM:
+                self._apply_view_change(f"acronym -> [b]{letters.upper() or '-'}[/b]")
+            else:
+                self._save_settings()
+        elif event.input.id == "initial-input":
+            initial = self._clean_initial(event.value)
+            if initial == self._name_filter.initial:
+                return
+            self._set_filter(
+                dataclasses.replace(self._name_filter, initial=initial),
+                f"starts with -> [b]{initial.upper() or 'any'}[/b]",
+            )
+
+    def _set_filter(self, name_filter: NameFilter, log_text: str) -> None:
+        """Neuer Filter. Aendert sich der Vorrat oder die Alliteration, neue Recipes."""
+        old = self._name_filter
+        self._name_filter = name_filter
+        if (old.active, old.alliteration) != (name_filter.active, name_filter.alliteration):
+            self._recipes.pop(CUSTOM_SEED_SLUG, None)
+            self._ensure_seed_recipes()
+            if self._variant_mode:
+                self._reroll_variants()
+        self._ensure_recipes()
+        self._log_event(log_text)
+        self._save_settings()
+        self._rerender()
+
+    def _apply_view_change(self, log_text: str) -> None:
+        """Methode, Ton oder Akronym geaendert: Varianten enden, Stapel neu, speichern."""
+        if self._variant_mode:
+            self._variant_mode = False
+            self.sub_title = self.theme_slug
+        self._ensure_recipes()
+        self._log_event(log_text)
+        self._save_settings()
+        self._rerender()
 
     def _apply_seed_change(self, log_text: str) -> None:
         """Partner oder Position des Seeds geaendert: neue Recipes, speichern, neu zeichnen."""
@@ -1180,9 +1506,8 @@ class CodenameApp(App[None]):
         partner_select = self.query_one("#seed-partner-select", Select)
         partner_select.set_options(self._partner_options())
         partner_select.value = self._seed_partner or SEED_PARTNER_MODIFIERS
-        # Dasselbe fuer den Mix-Partner.
-        if self._mix_partner and self._mix_partner not in visible:
-            self._mix_partner = ""
+        # Der Mix-Partner bleibt - ein Mix braucht keine gemeinsame Sprache. Nur
+        # die Reihenfolge der Auswahl zieht nach.
         mix_select = self.query_one("#mix-select", Select)
         mix_select.set_options(self._mix_options())
         mix_select.value = self._mix_partner or MIX_NONE

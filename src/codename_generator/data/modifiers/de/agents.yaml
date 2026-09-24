@@ -39,3 +39,54 @@ words:
   - Sortierer
   - Sichter
   - Melder
+  # Erweiterung 24.09.2026
+  - Wanderer
+  - Pilger
+  - Herold
+  - Seher
+  - Ritter
+  - Streiter
+  - Kämpfer
+  - Recke
+  - Bewahrer
+  - Erbauer
+  - Lenker
+  - Treiber
+  - Brecher
+  - Schürfer
+  - Hirte
+  - Kartograf
+  - Flieger
+  - Renner
+  - Gießer
+  - Zeichner
+  - Rufer
+  - Wandler
+
+# Tonalitaet: welche Woerter zu einem Ton passen. Ein Wort darf mehrere Toene
+# tragen oder keinen. Jedes Wort hier muss oben in `words` stehen.
+tones:
+  dark: [
+    Späher, Kundschafter, Jäger, Fährtenleser, Wächter, Wärter, Aufseher, Turmwart,
+    Sichter, Seher, Schürfer, Hüter
+  ]
+  bright: [
+    Bote, Herold, Rufer, Melder, Pfadfinder, Wegweiser, Zeichner, Weber, Sammler,
+    Lehrling, Flieger, Pilger
+  ]
+  noble: [
+    Meister, Baumeister, Ritter, Chronist, Ratgeber, Seher, Hüter, Bewahrer, Erbauer,
+    Schmied, Herold, Recke, Lotse, Steuermann
+  ]
+  swift: [
+    Läufer, Reiter, Kurier, Bote, Renner, Flieger, Jäger, Lenker, Treiber, Melder,
+    Lotse, Späher
+  ]
+  calm: [
+    Hüter, Bewahrer, Sammler, Schreiber, Chronist, Zähler, Sortierer, Verwalter, Weber,
+    Hirte, Wanderer, Pilger, Turmwart, Ratgeber
+  ]
+  fierce: [
+    Jäger, Kämpfer, Streiter, Recke, Ritter, Brecher, Schmied, Gießer, Torwart,
+    Treiber, Wächter
+  ]

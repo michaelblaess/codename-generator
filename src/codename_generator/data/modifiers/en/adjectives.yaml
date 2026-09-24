@@ -143,3 +143,36 @@ words:
   - twitchy
   - wonky
   - zany
+
+# Tonalitaet: welche Woerter zu einem Ton passen. Ein Wort darf mehrere Toene
+# tragen oder keinen. Jedes Wort hier muss oben in `words` stehen.
+tones:
+  dark: [
+    silent, hidden, dark, deep, shadow, hollow, dormant, twilight, dusk, night, nadir,
+    obsidian, charcoal, onyx, ebony, sable, misty, foggy, stormy, gloomy, dreary,
+    rogue, sneaky, shifty, frozen, indigo
+  ]
+  bright: [
+    bright, radiant, vivid, solar, dawn, sunny, golden, amber, emerald, jade, mint,
+    turquoise, cyan, azure, coral, peach, lime, chipper, giddy, perky, peppy, zippy,
+    lucky, groovy, sassy, cheeky, snazzy, witty, breezy, balmy
+  ]
+  noble: [
+    noble, ancient, eternal, prime, alpha, zenith, lunar, cosmic, velvet, golden,
+    silver, pearl, ivory, sapphire, emerald, obsidian, crimson, scarlet, bronze,
+    radiant, vast, sable
+  ]
+  swift: [
+    swift, quick, keen, sharp, rising, blazing, electric, snappy, zippy, jumpy, frisky,
+    peppy, twitchy, jittery, falling
+  ]
+  calm: [
+    calm, quiet, silent, dreaming, dreamy, drifting, dormant, sleepy, misty, hazy,
+    cloudy, balmy, velvet, lavender, mauve, pearl, ivory, mint, azure, cerulean, deep,
+    vast, twilight, dawn, dusk, lunar
+  ]
+  fierce: [
+    fierce, wild, bold, feral, rogue, sharp, blazing, stormy, thunder, molten, icy,
+    crimson, scarlet, vermillion, rust, gritty, cranky, edgy, cocky, feisty, plucky,
+    spunky, grumpy, snarky
+  ]

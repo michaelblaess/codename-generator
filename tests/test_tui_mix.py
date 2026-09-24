@@ -47,12 +47,22 @@ def test_mix_kreuzt_speichert_und_faellt_zurueck(isolated_settings: Path) -> Non
             await pilot.pause()
             assert [s.name for s in app.suggestions] == vorher
 
-            # Sternbilder sind englisch - auf Deutsch faellt der Mix weg.
+            # Sternbilder sind englisch - der Mix bleibt trotzdem, er braucht
+            # keine Zusaetze und damit keine gemeinsame Sprache.
             app.query_one("#mix-select", Select).value = "constellations"
             await pilot.pause()
             await app._apply_language("de")
             await pilot.pause()
-            assert app._mix_partner == ""
-            assert app.query_one("#mix-select", Select).value == MIX_NONE
+            assert app._mix_partner == "constellations"
+            assert app.query_one("#mix-select", Select).value == "constellations"
+            recipes = app._recipes[app._theme_key()]
+            assert recipes
+            assert all(r.theme_word.casefold() in sterne for r in recipes)
+
+            # Umgekehrt: ein deutsches Theme als Partner in der englischen Ansicht.
+            await app._apply_language("en")
+            await pilot.pause()
+            labels = [str(label) for label, _ in app._mix_options()]
+            assert "Tierwelt (DE)" in labels
 
     asyncio.run(run())

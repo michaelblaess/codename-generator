@@ -93,7 +93,7 @@ def test_vary_keeps_word_then_modifier(isolated_settings: Path) -> None:
             app.word_count = 2
             app._switch_theme("theme-animals")
             await pilot.pause()
-            base = app._recipes["animals"][0]
+            base = app._shown_recipes[0]
             first = app.suggestions[0].name
 
             await pilot.press("w")
@@ -104,7 +104,7 @@ def test_vary_keeps_word_then_modifier(isolated_settings: Path) -> None:
             assert all(base.theme_word in n for n in names), names
 
             # Von der ersten Variante aus: Zusatz halten, Tier wechselt.
-            variant = app._recipes["__variant__"][0]
+            variant = app._shown_recipes[0]
             await pilot.press("m")
             await pilot.pause()
             recipes = app._recipes["__variant__"]

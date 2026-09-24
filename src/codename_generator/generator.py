@@ -4,11 +4,13 @@ import random
 import re
 import unicodedata
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
+from codename_generator.coinage import CoinModel, blend_pairs, coin_words
 from codename_generator.grammar import GERMAN, inflect_attribute
 from codename_generator.phonetic import mutate
+from codename_generator.scoring import NameFilter, matches, sound_score
 from codename_generator.wordlist import (
     DEFAULT_LANGUAGE,
     NEUTRAL_LANGUAGE,
@@ -47,6 +49,49 @@ class VariantKeep(StrEnum):
     WORD = "word"
     # Zusaetze und Pattern bleiben, das Theme-Wort wechselt.
     MODIFIER = "modifier"
+
+
+class Method(StrEnum):
+    """Wie die Namen einer Themenansicht entstehen."""
+
+    # Theme-Woerter mit Zusaetzen - das bisherige Verfahren.
+    WORDS = "words"
+    # Neue Woerter im Klang des Themes (Buchstabenmodell).
+    COINED = "coined"
+    # Zwei Theme-Woerter an einem gemeinsamen Buchstaben verschmolzen.
+    BLEND = "blend"
+    # Vorgegebene Anfangsbuchstaben, jedes Wort beginnt mit seinem.
+    ACRONYM = "acronym"
+
+
+ACRONYM_MAX_LETTERS = 3
+
+# Welche Rolle an welcher Stelle eines Patterns steht - fuer das Akronym, bei
+# dem jede Stelle ihren eigenen Anfangsbuchstaben hat.
+_PATTERN_ROLES: dict[Pattern, tuple[str, ...]] = {
+    Pattern.THEME_ONLY: ("theme",),
+    Pattern.ADJ_THEME: ("adjective", "theme"),
+    Pattern.VERB_THEME: ("verb", "theme"),
+    Pattern.THEME_VERB: ("theme", "verb"),
+    Pattern.THEME_AGENT: ("theme", "agent"),
+    Pattern.ADJ_THEME_VERB: ("adjective", "theme", "verb"),
+    Pattern.ADJ_VERB_THEME: ("adjective", "verb", "theme"),
+}
+
+
+def same_initial(pool: tuple[str, ...], word: str) -> tuple[str, ...]:
+    """Woerter des Pools mit dem Anfangsbuchstaben von `word` - ohne Treffer der ganze Pool.
+
+    Grundlage der Alliteration: der Filter allein faende bei einem Theme von
+    hundert Woertern kaum einen Namen, der gleich anlautet.
+    """
+    initial = word[:1].lower()
+    return tuple(w for w in pool if w[:1].lower() == initial) or pool
+
+
+def normalize_letters(raw: str) -> str:
+    """Akronym-Eingabe bereinigen: nur Buchstaben, klein, hoechstens drei."""
+    return "".join(ch for ch in raw.lower() if ch.isalpha())[:ACRONYM_MAX_LETTERS]
 
 
 class AnchorPosition(StrEnum):
@@ -284,6 +329,57 @@ def _build_random_theme(themes: dict[str, WordList], language: str) -> WordList:
     )
 
 
+# Mit aktivem Filter faellt ein Teil der Namen weg - der Vorrat wird um diesen
+# Faktor groesser gezogen, damit die Liste trotzdem voll wird.
+FILTER_POOL_FACTOR = 8
+
+
+@dataclass(frozen=True)
+class StackRequest:
+    """Was ein Stapel der Themenansicht braucht."""
+
+    theme: WordList
+    count: int
+    language: str | None = None
+    method: Method = Method.WORDS
+    # Zweites Theme: Mix bei WORDS, Lernstoff bei COINED, hintere Haelfte bei BLEND.
+    partner: WordList | None = None
+    tone: str = ""
+    letters: str = ""
+    # Zusaetze bevorzugt mit dem Anfangsbuchstaben des Theme-Worts (Alliteration).
+    alliterate: bool = False
+
+
+@dataclass(frozen=True)
+class Stack:
+    """Ein erzeugter Stapel: das Theme, mit dem gerendert wird, und seine Recipes."""
+
+    theme: WordList
+    recipes: list[Recipe]
+
+
+@dataclass(frozen=True)
+class PresentOptions:
+    """Darstellung eines Stapels: Wortzahl, Mutation, Filter, Sortierung, Anzahl."""
+
+    word_count: int = 2
+    mutation_chance: float = 0.35
+    language: str | None = None
+    name_filter: NameFilter = field(default_factory=NameFilter)
+    sort_by_score: bool = False
+    # 0 = alle zeigen.
+    limit: int = 0
+
+
+@dataclass(frozen=True)
+class Presented:
+    """Ein angezeigter Treffer samt Recipe und Klangwert."""
+
+    recipe: Recipe
+    suggestion: Suggestion
+    score: int
+
+
 @dataclass
 class Generator:
     themes: dict[str, WordList]
@@ -313,11 +409,34 @@ class Generator:
         """Sprachen, in denen generiert werden kann - Default-Sprache zuerst."""
         return tuple(sorted(self.modifiers, key=lambda lang: (lang != DEFAULT_LANGUAGE, lang)))
 
-    def _modifier_pool(self, language: str, role: str) -> tuple[str, ...]:
-        """Woerter eines Modifier-Pools, mit Rueckfall auf die Default-Sprache."""
+    def _modifier_pool(self, language: str, role: str, tone: str = "") -> tuple[str, ...]:
+        """Woerter eines Modifier-Pools, mit Rueckfall auf die Default-Sprache.
+
+        Ein Ton schraenkt den Pool auf die markierten Woerter ein. Traegt kein
+        Wort des Pools den Ton, gilt der ganze Pool - lieber ein Name ohne
+        passende Stimmung als gar keiner.
+        """
         pools = self.modifiers.get(language) or self.modifiers.get(DEFAULT_LANGUAGE, {})
         wordlist = pools.get(role)
-        return wordlist.words if wordlist else ()
+        if wordlist is None:
+            return ()
+        return (wordlist.words_for_tone(tone) if tone else ()) or wordlist.words
+
+    def _theme_pool(
+        self, theme: WordList, language: str, role: str, tone: str = ""
+    ) -> tuple[str, ...]:
+        """Zusaetze fuer ein Theme: eigene Liste des Themes oder der Pool der Sprache.
+
+        Eigene Listen tragen keine Toene. Ein Ton filtert sie ueber die
+        Markierungen des Sprach-Pools, bleibt nichts uebrig, gilt die ganze Liste.
+        """
+        own = theme.adjectives if role == "adjectives" else theme.verbs if role == "verbs" else ()
+        if not own:
+            return self._modifier_pool(language, role, tone)
+        if not tone:
+            return own
+        tagged = set(self._modifier_pool(language, role, tone))
+        return tuple(word for word in own if word in tagged) or own
 
     def generate_seeded_recipes(
         self,
@@ -325,6 +444,8 @@ class Generator:
         count: int = 30,
         language: str = DEFAULT_LANGUAGE,
         position: AnchorPosition = AnchorPosition.ANY,
+        tone: str = "",
+        alliterate: bool = False,
     ) -> list[Recipe]:
         """Erzeugt `count` Recipes mit einem festen `seed` als Theme-Wort.
 
@@ -339,13 +460,15 @@ class Generator:
         der uebergebenen Sprache. `position` muss dieselbe sein wie beim
         passenden `seeded_theme`, sonst zeigen Index und Pattern auseinander.
         """
+        adjectives = self._modifier_pool(language, "adjectives", tone)
+        verbs = self._modifier_pool(language, "verbs", tone)
+        agents = self._modifier_pool(language, "agents", tone)
+        if alliterate:
+            adjectives = same_initial(adjectives, seed)
+            verbs = same_initial(verbs, seed)
+            agents = same_initial(agents, seed)
         return self._modifier_recipes(
-            seed,
-            count,
-            anchor_modifier_patterns(language, position),
-            self._modifier_pool(language, "adjectives"),
-            self._modifier_pool(language, "verbs"),
-            self._modifier_pool(language, "agents"),
+            seed, count, anchor_modifier_patterns(language, position), adjectives, verbs, agents
         )
 
     def _modifier_recipes(
@@ -557,8 +680,191 @@ class Generator:
             )
         return recipes
 
+    def coined_theme(
+        self,
+        theme: WordList,
+        count: int = 30,
+        language: str | None = None,
+        partner: WordList | None = None,
+    ) -> WordList:
+        """Virtuelles Theme aus Kunstwoertern im Klang von `theme` (und `partner`).
+
+        Mit Partner lernt das Modell aus beiden Themes - die neuen Woerter
+        klingen dann nach einer Mischung. Kunstwoerter werden nicht mutiert,
+        sie sind schon neu.
+        """
+        words = list(theme.words) + (list(partner.words) if partner else [])
+        coined = coin_words(CoinModel.from_words(words), self.rng, count)
+        name = f"{theme.name} x {partner.name}" if partner else theme.name
+        suffix = f"-{partner.slug}" if partner else ""
+        return WordList(
+            slug=f"coined-{theme.slug}{suffix}",
+            name=f"{name} (coined)",
+            description=f"new words that sound like {name}",
+            words=tuple(coined),
+            mutate=False,
+            language=effective_language(theme, language),
+        )
+
+    def blended_theme(
+        self,
+        first: WordList,
+        second: WordList,
+        count: int = 30,
+        language: str | None = None,
+    ) -> WordList:
+        """Virtuelles Theme aus Kofferwoertern: vorn ein Wort aus `first`, hinten eins aus `second`.
+
+        Das hintere Wort traegt den Kopf des Kofferworts - von ihm kommen Genus
+        und Sprache, wie bei einem zusammengesetzten Hauptwort.
+        """
+        pairs = blend_pairs(first.words, second.words, self.rng, count)
+        genders = tuple(second.gender_of(b) for _, b, _ in pairs)
+        name = first.name if first.slug == second.slug else f"{first.name} x {second.name}"
+        return WordList(
+            slug=f"blend-{first.slug}-{second.slug}",
+            name=f"{name} (blends)",
+            description=f"two words of {name} melted into one",
+            words=tuple(word for _, _, word in pairs),
+            mutate=False,
+            language=effective_language(second, language),
+            genders=genders if any(genders) else (),
+        )
+
+    def acronym_theme(
+        self, theme: WordList, letters: str, language: str | None = None, tone: str = ""
+    ) -> WordList:
+        """Virtuelles Theme fuer ein Akronym: nur einteilige Woerter, feste Patterns.
+
+        Die Patterns sind die der Sprache fuer die Buchstabenzahl, gefiltert auf
+        die, bei denen jede Stelle ein Wort mit ihrem Buchstaben findet. Ohne
+        passendes Pattern bleibt die Liste leer - es gibt dann keine Treffer.
+        """
+        lang = effective_language(theme, language)
+        letters = normalize_letters(letters)
+        single = tuple(w for w in theme.words if len(w.split()) == 1)
+        feasible = self._acronym_patterns(theme, single, letters, lang, tone)
+        genders = tuple(theme.gender_of(w) for w in single)
+        return WordList(
+            slug=f"acronym-{theme.slug}",
+            name=f"{theme.name}: {letters.upper()}",
+            description=f"names whose words start with {', '.join(letters.upper())}",
+            words=single,
+            patterns=tuple(p.value for p in feasible),
+            mutate=False,
+            language=lang,
+            genders=genders if any(genders) else (),
+        )
+
+    def _acronym_candidates(
+        self,
+        role: str,
+        theme_words: tuple[str, ...],
+        theme: WordList,
+        language: str,
+        tone: str,
+        letter: str,
+    ) -> tuple[str, ...]:
+        """Woerter fuer eine Stelle des Akronyms, die mit `letter` beginnen.
+
+        Findet der Ton kein passendes Wort, gilt der ganze Pool der Rolle.
+        """
+        pools: tuple[tuple[str, ...], ...]
+        if role == "theme":
+            pools = (theme_words,)
+        elif role == "agent":
+            pools = (
+                self._modifier_pool(language, "agents", tone),
+                self._modifier_pool(language, "agents"),
+            )
+        else:
+            plural = f"{role}s"
+            pools = (
+                self._theme_pool(theme, language, plural, tone),
+                self._theme_pool(theme, language, plural),
+            )
+        for pool in pools:
+            found = tuple(w for w in pool if w[:1].lower() == letter)
+            if found:
+                return found
+        return ()
+
+    def _acronym_patterns(
+        self,
+        theme: WordList,
+        theme_words: tuple[str, ...],
+        letters: str,
+        language: str,
+        tone: str,
+    ) -> tuple[Pattern, ...]:
+        """Patterns, bei denen jede Stelle ein Wort mit ihrem Buchstaben findet."""
+        if not letters:
+            return ()
+        candidates: tuple[Pattern, ...]
+        if len(letters) == 1:
+            candidates = (Pattern.THEME_ONLY,)
+        elif len(letters) == 2:
+            candidates = _two_word_patterns(language)
+        else:
+            candidates = (_three_word_pattern(language),)
+        return tuple(
+            pattern
+            for pattern in candidates
+            if all(
+                self._acronym_candidates(role, theme_words, theme, language, tone, letters[k])
+                for k, role in enumerate(_PATTERN_ROLES[pattern])
+            )
+        )
+
+    def generate_acronym_recipes(
+        self,
+        acronym: WordList,
+        source: WordList,
+        letters: str,
+        count: int = 30,
+        tone: str = "",
+    ) -> list[Recipe]:
+        """Recipes fuer ein Akronym - `acronym` kommt aus `acronym_theme(source, ...)`.
+
+        `pattern_index` zeigt in die Patterns des virtuellen Themes. Jede Stelle
+        zieht ein Wort mit ihrem Buchstaben, doppelte Namen fallen weg.
+        """
+        letters = normalize_letters(letters)
+        patterns = _patterns_from_strings(acronym.patterns)
+        recipes: list[Recipe] = []
+        seen: set[tuple[str, ...]] = set()
+        attempts = 0
+        max_attempts = count * 40
+        while patterns and len(recipes) < count and attempts < max_attempts:
+            attempts += 1
+            index = self.rng.randrange(len(patterns))
+            roles = _PATTERN_ROLES[patterns[index]]
+            chosen = {"theme": "", "adjective": "", "verb": "", "agent": ""}
+            for k, role in enumerate(roles):
+                chosen[role] = self.rng.choice(
+                    self._acronym_candidates(
+                        role, acronym.words, source, acronym.language, tone, letters[k]
+                    )
+                )
+            key = (patterns[index].value, *(chosen[role].lower() for role in roles))
+            if key in seen:
+                continue
+            seen.add(key)
+            recipes.append(
+                Recipe(
+                    theme_word=chosen["theme"],
+                    adjective=chosen["adjective"],
+                    verb=chosen["verb"],
+                    agent=chosen["agent"],
+                    pattern_index=index,
+                    mutation_roll=self.rng.random(),
+                    mutation_seed=self.rng.randrange(_SEED_CEILING),
+                )
+            )
+        return recipes
+
     def generate_recipes(
-        self, theme_slug: str, count: int = 30, language: str | None = None
+        self, theme_slug: str, count: int = 30, language: str | None = None, tone: str = ""
     ) -> list[Recipe]:
         """Erzeugt `count` zufaellige Recipes - jedes Theme-Wort nur einmal.
 
@@ -567,11 +873,25 @@ class Generator:
         """
         if theme_slug not in self.themes:
             raise KeyError(f"Unknown theme: {theme_slug}")
-        theme = self.themes[theme_slug]
+        return self.generate_theme_recipes(self.themes[theme_slug], count, language, tone)
+
+    def generate_theme_recipes(
+        self,
+        theme: WordList,
+        count: int = 30,
+        language: str | None = None,
+        tone: str = "",
+        alliterate: bool = False,
+    ) -> list[Recipe]:
+        """Wie `generate_recipes`, aber fuer ein uebergebenes (auch virtuelles) Theme.
+
+        `alliterate` zieht die Zusaetze bevorzugt mit dem Anfangsbuchstaben des
+        Theme-Worts. Ohne den Schalter bleibt die Zugfolge unveraendert.
+        """
         lang = effective_language(theme, language)
-        adjectives = theme.adjectives or self._modifier_pool(lang, "adjectives")
-        verbs = theme.verbs or self._modifier_pool(lang, "verbs")
-        agents = self._modifier_pool(lang, "agents")
+        adjectives = self._theme_pool(theme, lang, "adjectives", tone)
+        verbs = self._theme_pool(theme, lang, "verbs", tone)
+        agents = self._modifier_pool(lang, "agents", tone)
         recipes: list[Recipe] = []
         seen: set[str] = set()
         attempts = 0
@@ -587,9 +907,15 @@ class Generator:
             recipes.append(
                 Recipe(
                     theme_word=theme_word,
-                    adjective=self.rng.choice(adjectives),
-                    verb=self.rng.choice(verbs),
-                    agent=self.rng.choice(agents) if agents else "",
+                    adjective=self.rng.choice(
+                        same_initial(adjectives, theme_word) if alliterate else adjectives
+                    ),
+                    verb=self.rng.choice(same_initial(verbs, theme_word) if alliterate else verbs),
+                    agent=(
+                        self.rng.choice(same_initial(agents, theme_word) if alliterate else agents)
+                        if agents
+                        else ""
+                    ),
                     pattern_index=self.rng.randrange(pattern_choices),
                     mutation_roll=self.rng.random(),
                     mutation_seed=self.rng.randrange(_SEED_CEILING),
@@ -604,6 +930,7 @@ class Generator:
         keep: VariantKeep,
         count: int = 30,
         language: str | None = None,
+        tone: str = "",
     ) -> list[Recipe]:
         """Varianten eines Treffers: ein Teil bleibt stehen, der andere wird neu gewuerfelt.
 
@@ -629,9 +956,9 @@ class Generator:
             base.theme_word,
             count,
             declared or _two_word_patterns(lang),
-            theme.adjectives or self._modifier_pool(lang, "adjectives"),
-            theme.verbs or self._modifier_pool(lang, "verbs"),
-            self._modifier_pool(lang, "agents"),
+            self._theme_pool(theme, lang, "adjectives", tone),
+            self._theme_pool(theme, lang, "verbs", tone),
+            self._modifier_pool(lang, "agents", tone),
             exclude=base,
         )
 
@@ -801,6 +1128,63 @@ class Generator:
             mutated=mutated,
             source_words=favorite.source_words,
         )
+
+    def build_stack(self, request: StackRequest) -> Stack:
+        """Ein Stapel der Themenansicht: das (virtuelle) Theme und seine Recipes.
+
+        Hier laufen Methode, Mix-Partner, Ton und Akronym zusammen - TUI, CLI und
+        (als Port) das Web bauen ihre Themenansicht nur ueber diesen Weg.
+        """
+        theme, partner, lang, tone = (
+            request.theme,
+            request.partner,
+            request.language,
+            request.tone,
+        )
+        count = request.count
+        if request.method == Method.COINED:
+            coined = self.coined_theme(theme, count, lang, partner)
+            recipes = self.generate_theme_recipes(coined, count, lang, tone, request.alliterate)
+            return Stack(coined, recipes)
+        if request.method == Method.BLEND:
+            blended = self.blended_theme(theme, partner or theme, count, lang)
+            recipes = self.generate_theme_recipes(blended, count, lang, tone, request.alliterate)
+            return Stack(blended, recipes)
+        if request.method == Method.ACRONYM:
+            acronym = self.acronym_theme(theme, request.letters, lang, tone)
+            recipes = self.generate_acronym_recipes(acronym, theme, request.letters, count, tone)
+            return Stack(acronym, recipes)
+        if partner is not None and partner.slug != theme.slug:
+            crossed = self.crossed_theme(theme, partner, lang)
+            return Stack(crossed, self.generate_crossed_recipes(theme, partner, count))
+        recipes = self.generate_theme_recipes(theme, count, lang, tone, request.alliterate)
+        return Stack(theme, recipes)
+
+    def present(
+        self,
+        recipes: list[Recipe],
+        theme: WordList,
+        options: PresentOptions,
+    ) -> list[Presented]:
+        """Rendert Recipes und wendet Filter, Sortierung und Anzahl an.
+
+        Jeder Eintrag behaelt sein Recipe, damit Variieren auch nach Filter und
+        Sortierung den richtigen Treffer erwischt.
+        """
+        lang = effective_language(theme, options.language)
+        result: list[Presented] = []
+        for recipe in recipes:
+            suggestion = self.render(
+                recipe, theme, options.word_count, options.mutation_chance, options.language
+            )
+            if options.name_filter.active and not matches(
+                suggestion.name, options.name_filter, lang
+            ):
+                continue
+            result.append(Presented(recipe, suggestion, sound_score(suggestion.name, lang)))
+        if options.sort_by_score:
+            result.sort(key=lambda item: -item.score)
+        return result[: options.limit] if options.limit else result
 
     def suggest(
         self,

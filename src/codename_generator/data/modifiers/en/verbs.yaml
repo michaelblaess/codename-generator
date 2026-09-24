@@ -70,3 +70,30 @@ words:
   - wind
   - work
   - write
+
+# Tonalitaet: welche Woerter zu einem Ton passen. Ein Wort darf mehrere Toene
+# tragen oder keinen. Jedes Wort hier muss oben in `words` stehen.
+tones:
+  dark: [
+    hunt, seek, slip, fade, bind, reap, track, watch, stir, split, break
+  ]
+  bright: [
+    light, spark, sing, dance, grow, rise, shape, dream, echo, fly, find, plant, wake,
+    skip, write
+  ]
+  noble: [
+    guard, forge, mend, wield, shape, speak, steer, tame, stand, read, write, weave,
+    work, rise, reach
+  ]
+  swift: [
+    run, fly, leap, jump, dive, chase, ride, spin, slip, stride, strike, send, skip,
+    swing, move, turn, track, pass
+  ]
+  calm: [
+    drift, flow, dream, sleep, fade, sway, wander, roam, swim, weave, walk, watch,
+    grow, plant, sow, read, mend, wind
+  ]
+  fierce: [
+    strike, break, hunt, chase, split, spark, forge, smelt, shift, wield, climb,
+    stride, tame, take, cross, stir
+  ]
