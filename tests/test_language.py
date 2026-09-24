@@ -108,7 +108,9 @@ def test_neutral_themes_follow_the_chosen_language() -> None:
 def test_neutral_theme_is_inflected_when_german_is_active() -> None:
     """Ohne Genus-Marker gilt das Maskulinum - "Stiller Secretariat"."""
     gen = Generator.load(seed=13)
-    suggestions = gen.suggest("swatch", count=30, mutation_chance=0.0, word_count=2, language="de")
+    suggestions = gen.suggest(
+        "racehorses", count=30, mutation_chance=0.0, word_count=2, language="de"
+    )
     front = [s for s in suggestions if s.pattern in (Pattern.ADJ_THEME, Pattern.VERB_THEME)]
     assert front
     for s in front:
@@ -125,8 +127,8 @@ def test_language_does_not_override_a_bound_theme() -> None:
 
 def test_effective_language_resolution() -> None:
     themes = load_themes()
-    assert effective_language(themes["swatch"], "de") == "de"
-    assert effective_language(themes["swatch"], None) == "en"
+    assert effective_language(themes["racehorses"], "de") == "de"
+    assert effective_language(themes["racehorses"], None) == "en"
     assert effective_language(themes[_GERMAN_THEME], "en") == "de"
     assert effective_language(themes["animals"], "de") == "en"
 
@@ -134,7 +136,7 @@ def test_effective_language_resolution() -> None:
 def test_neutral_themes_are_declared() -> None:
     """Eigennamen-Themes sind als neutral markiert, Gattungswoerter nicht."""
     themes = load_themes()
-    for slug in ("swatch", "racehorses", "whisky", "greek-gods", "mountains"):
+    for slug in ("racehorses", "whisky", "wines", "greek-gods", "mountains"):
         assert themes[slug].language == "neutral", slug
     for slug in ("animals", "flowers", "gemstones", "zodiac", "constellations"):
         assert themes[slug].language == "en", slug

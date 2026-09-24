@@ -25,13 +25,13 @@ Ein Codename-Generator für das Terminal. Wähle ein Thema (griechische Götter,
 
 ## Themen
 
-Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Gefährliche Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Swatch-Uhren · Dev · Flugsicherung · Random (gepoolt)
+Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Gefährliche Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Dev · Flugsicherung · Random (gepoolt)
 
 Deutsche Themen (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
 Themen, deren Wörter Eigennamen sind (griechische/ägyptische/nordische Götter,
-Rennpferde, Berge, Wahrzeichen, historische Schiffe, Whisky, Weine,
-Swatch-Uhren), stehen auf `language: neutral`. Sie erscheinen in jeder Sprache
+Rennpferde, Berge, Wahrzeichen, historische Schiffe, Whisky, Weine), stehen auf
+`language: neutral`. Sie erscheinen in jeder Sprache
 und übernehmen die Modifikatoren der gewählten - `Silent Secretariat` auf
 Englisch, `Stiller Secretariat` auf Deutsch.
 
@@ -131,7 +131,7 @@ uv run codename -t random -n 20         # pulls from every theme
 uv run codename -t whisky --words 3     # exactly 3 components per name
 uv run codename --list-themes --lang de  # deutsche plus neutrale Themen
 uv run codename -t tierwelt -n 10       # deutsche Namen, korrekt gebeugt
-uv run codename -t swatch --lang de      # Eigennamen, deutsche Modifikatoren
+uv run codename -t racehorses --lang de  # Eigennamen, deutsche Modifikatoren
 uv run codename -w Sitemap              # eigenes Wort mit Zusätzen
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
 uv run codename -t whisky --mix constellations   # Snowdon Lepus ...

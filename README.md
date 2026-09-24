@@ -25,12 +25,12 @@ A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, 
 
 ## Themes
 
-Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Swatch watches · Dev · Air traffic control · Random (pooled)
+Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Dev · Air traffic control · Random (pooled)
 
 German themes (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
 Themes whose words are proper names (Greek/Egyptian/Norse gods, racehorses,
-mountains, landmarks, historic ships, whisky, wines, Swatch watches) are marked
+mountains, landmarks, historic ships, whisky, wines) are marked
 `language: neutral`. They show up in every language and take the modifiers of
 the one you picked - `Silent Secretariat` in English, `Stiller Secretariat` in
 German.
@@ -125,7 +125,7 @@ uv run codename -t random -n 20         # pulls from every theme
 uv run codename -t whisky --words 3     # exactly 3 components per name
 uv run codename --list-themes --lang de  # German plus the neutral themes
 uv run codename -t tierwelt -n 10       # German names, inflected
-uv run codename -t swatch --lang de      # proper names, German modifiers
+uv run codename -t racehorses --lang de  # proper names, German modifiers
 uv run codename -w Sitemap              # your own word with modifiers
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
 uv run codename -t whisky --mix constellations   # Snowdon Lepus ...
