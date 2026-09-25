@@ -21,16 +21,16 @@
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Themes](https://img.shields.io/badge/themes-23-yellow)](src/codename_generator/data/themes)
 
-A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, whisky, ...), get a batch of unique suggestions (10 to 40, your pick) combined with adjective or verb modifiers and optional phonetic mutations.
+A terminal codename generator. Pick a theme (Greek gods, racehorses, gemstones, constellations, ...), get a batch of unique suggestions (10 to 40, your pick) combined with adjective or verb modifiers and optional phonetic mutations.
 
 ## Themes
 
-Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Wines · Whisky · Mountains · Mushrooms · Historic ships · Landmarks · Dev · Air traffic control · Random (pooled)
+Greek gods · Egyptian gods · Norse gods · Constellations · Zodiac · Animals · Dangerous animals · Racehorses · Flowers · Gemstones · Mountains · Mushrooms · Historic ships · Landmarks · Dev · Air traffic control · Random (pooled)
 
 German themes (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
 Themes whose words are proper names (Greek/Egyptian/Norse gods, racehorses,
-mountains, landmarks, historic ships, whisky, wines) are marked
+mountains, landmarks, historic ships) are marked
 `language: neutral`. They show up in every language and take the modifiers of
 the one you picked - `Silent Secretariat` in English, `Stiller Secretariat` in
 German.
@@ -76,8 +76,8 @@ in front or at the back. With a partner theme only the partner's word mutates, y
 stays as typed. A fixed position or a partner theme sets the name to two words.
 
 **Theme mix** (*Mix with* in the settings panel): the active theme is crossed with a
-second one, every name takes one word from each (`Snowdon Lepus`, `Fomalhaut
-Lhotse`). No word appears twice in a batch. Themes of the other language work too, they
+second one, every name takes one word from each (`Matterhorn Monoceros`,
+`Snowdon Aries`). No word appears twice in a batch. Themes of the other language work too, they
 carry their language code in the list (`Tierwelt (DE)`).
 
 **Varying:** `w` keeps the word of the highlighted suggestion and rolls new modifiers
@@ -86,8 +86,8 @@ carry their language code in the list (`Tierwelt (DE)`).
 variant, `w`/`m` go on from there, `r` rerolls, picking a theme in the list goes back.
 
 **Methods** (bar above the list): *Theme words* is the classic way. *Coined words* invents
-new words that sound like the theme (`Lintora`, `Nories`), a mix partner adds its sound.
-*Blends* melt two theme words at a shared letter (`Orion` + `Taurus` = `Orisker`), with a
+new words that sound like the theme (`Athelion`, `Leidon`), a mix partner adds its sound.
+*Blends* melt two theme words at a shared letter (`Orion` + `Andromeda` = `Oromeda`), with a
 mix partner the back half comes from the second theme. *Acronym* takes up to three letters,
 every word of the name starts with its letter (`SM` -> `Silent Marten`). Coined words and
 blends take modifiers like any theme word.
@@ -122,16 +122,16 @@ uv run codename --list-themes
 uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 uv run codename -t random -n 20         # pulls from every theme
-uv run codename -t whisky --words 3     # exactly 3 components per name
+uv run codename -t mountains --words 3  # exactly 3 components per name
 uv run codename --list-themes --lang de  # German plus the neutral themes
 uv run codename -t tierwelt -n 10       # German names, inflected
 uv run codename -t racehorses --lang de  # proper names, German modifiers
 uv run codename -w Sitemap              # your own word with modifiers
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
-uv run codename -t whisky --mix constellations   # Snowdon Lepus ...
+uv run codename -t mountains --mix constellations   # Matterhorn Monoceros ...
 uv run codename -t animals --tone dark                     # only dark modifiers
-uv run codename -t whisky --method coined --words 1        # Lintora, Nories ...
-uv run codename -t whisky --mix constellations --method blend --words 1
+uv run codename -t greek-gods --method coined --words 1    # Athelion, Leidon ...
+uv run codename -t greek-gods --mix constellations --method blend --words 1
 uv run codename -t animals --method acronym --letters SM   # Silent Marten ...
 uv run codename -t animals --initial s --max-syllables 3 --alliteration --sort
 uv run codename --export-favorites favorites.json          # for the web version

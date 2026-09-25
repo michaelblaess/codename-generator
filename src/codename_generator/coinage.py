@@ -21,20 +21,20 @@ _ORDER = 2
 COIN_MIN_LENGTH = 4
 COIN_MAX_LENGTH = 10
 # Ein Quellwort, das so lang ist, darf nicht als Ganzes im Kunstwort stecken -
-# "Lagavulinor" ist kein neues Wort, sondern ein altes mit Anhang.
+# "Andromedaris" ist kein neues Wort, sondern ein altes mit Anhang.
 _EMBEDDED_MIN_LENGTH = 4
 
 _BLEND_VOWELS = frozenset("aeiouyäöü")
 _BLEND_MIN_LENGTH = 4
 # Kofferwoerter zielen auf hoechstens acht Buchstaben - lange Quellwoerter
-# ("Bellatrix") ergaeben sonst Ungetueme, die keiner aussprechen mag.
+# ("Kilimanjaro") ergaeben sonst Ungetueme, die keiner aussprechen mag.
 _BLEND_TARGET_MAX = 8
 
 
 def coin_tokens(words: Iterable[str]) -> tuple[str, ...]:
     """Einzelwoerter eines Themes als Trainingsmaterial: klein, nur Buchstaben, ab 3 Zeichen.
 
-    Mehrteilige Eintraege ("Ursa Minor") zaehlen als zwei Woerter.
+    Mehrteilige Eintraege ("Ursa Major") zaehlen als zwei Woerter.
     """
     seen: dict[str, None] = {}
     for word in words:
@@ -131,10 +131,10 @@ def _edit_distance(a: str, b: str) -> int:
 
 
 def blend(first: str, second: str) -> str | None:
-    """Verschmilzt zwei Woerter an einem gemeinsamen Buchstaben ("Orion" + "Taurus").
+    """Verschmilzt zwei Woerter an einem gemeinsamen Buchstaben ("Orion" + "Andromeda").
 
     Vom ersten Wort bleibt der Anfang bis zu einem Buchstaben, den auch das
-    zweite hat, vom zweiten der Rest ab dort: "Ori" + "sker" = "Orisker". Unter
+    zweite hat, vom zweiten der Rest ab dort: "Oro" + "meda" = "Oromeda". Unter
     allen Nahtstellen gewinnt die, deren Laenge am naechsten am Mittel beider
     Woerter liegt (hoechstens acht), bei Gleichstand eine Naht auf einem Vokal, dann die mit mehr
     vom ersten Wort. Was nur einen Buchstaben von einem der beiden Woerter
@@ -154,7 +154,7 @@ def blend(first: str, second: str) -> str | None:
             if not _BLEND_MIN_LENGTH <= len(word) <= COIN_MAX_LENGTH or a in word or b in word:
                 continue
             # Ein Buchstabe Unterschied ist keine Verschmelzung, sondern eine
-            # Kopie: Aries + Arcturus ergab "Arrcturus".
+            # Kopie: Orion + Arcturus ergab "Orcturus".
             if _edit_distance(word, a) <= 1 or _edit_distance(word, b) <= 1:
                 continue
             key = (abs(len(word) - target), 0 if a[i - 1] in _BLEND_VOWELS else 1, -i, j)

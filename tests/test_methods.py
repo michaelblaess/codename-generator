@@ -102,8 +102,8 @@ def test_coined_theme_works_with_modifiers(gen: Generator) -> None:
 
 
 def test_coined_with_partner_learns_from_both(gen: Generator) -> None:
-    coined = gen.coined_theme(gen.themes["whisky"], 5, partner=gen.themes["constellations"])
-    assert coined.slug == "coined-whisky-constellations"
+    coined = gen.coined_theme(gen.themes["mountains"], 5, partner=gen.themes["constellations"])
+    assert coined.slug == "coined-mountains-constellations"
     assert len(coined.words) == 5
 
 
@@ -120,9 +120,9 @@ def test_blends_take_gender_from_the_second_word(gen: Generator) -> None:
 
 
 def test_blends_cross_two_themes(gen: Generator) -> None:
-    whisky, stars = gen.themes["whisky"], gen.themes["constellations"]
-    blended = gen.blended_theme(whisky, stars, 10)
-    assert blended.slug == "blend-whisky-constellations"
+    berge, stars = gen.themes["mountains"], gen.themes["constellations"]
+    blended = gen.blended_theme(berge, stars, 10)
+    assert blended.slug == "blend-mountains-constellations"
     assert len(set(w.lower() for w in blended.words)) == len(blended.words)
 
 

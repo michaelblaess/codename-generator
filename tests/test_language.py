@@ -136,7 +136,7 @@ def test_effective_language_resolution() -> None:
 def test_neutral_themes_are_declared() -> None:
     """Eigennamen-Themes sind als neutral markiert, Gattungswoerter nicht."""
     themes = load_themes()
-    for slug in ("racehorses", "whisky", "wines", "greek-gods", "mountains"):
+    for slug in ("racehorses", "ships", "landmarks", "greek-gods", "mountains"):
         assert themes[slug].language == "neutral", slug
     for slug in ("animals", "flowers", "gemstones", "zodiac", "constellations"):
         assert themes[slug].language == "en", slug

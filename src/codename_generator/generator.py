@@ -621,7 +621,7 @@ class Generator:
     def crossed_theme(
         self, first: WordList, second: WordList, language: str | None = None
     ) -> WordList:
-        """Virtuelles Theme: zwei Themes gekreuzt ("Taurus Orion", "Orion Taurus").
+        """Virtuelles Theme: zwei Themes gekreuzt ("Matterhorn Orion", "Orion Matterhorn").
 
         Technisch ein Anker, der wechselt: das Wort aus `first` steht als Anker
         im Recipe, das aus `second` als Theme-Wort. Damit gelten Genus,

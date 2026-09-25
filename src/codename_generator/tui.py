@@ -575,7 +575,7 @@ class CodenameApp(App[None]):
                     )
                     mix_select.tooltip = (
                         "Cross the active theme with a second one: "
-                        "one word from each, e.g. Taurus Orion"
+                        "one word from each, e.g. Matterhorn Monoceros"
                     )
                     yield mix_select
                     yield Static("Seed partner", classes="settings-label")
@@ -1026,7 +1026,7 @@ class CodenameApp(App[None]):
         """Auswahl fuer den Mix: keiner, die Themes der Sprache, dann die der anderen.
 
         Ein Mix braucht keine Zusaetze, also auch keine gemeinsame Sprache -
-        "Taurus Falke" geht. Fremdsprachige Themes tragen ihr Kuerzel.
+        "Matterhorn Falke" geht. Fremdsprachige Themes tragen ihr Kuerzel.
         """
         options = [("No mix", MIX_NONE)]
         visible = self._visible_theme_slugs()

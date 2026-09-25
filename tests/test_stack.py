@@ -38,9 +38,9 @@ def test_words_stack_equals_the_old_path() -> None:
 
 def test_words_stack_with_partner_is_the_mix(gen: Generator) -> None:
     stack = gen.build_stack(
-        StackRequest(theme=gen.themes["whisky"], count=10, partner=gen.themes["constellations"])
+        StackRequest(theme=gen.themes["mountains"], count=10, partner=gen.themes["constellations"])
     )
-    assert stack.theme.slug == "mix-whisky-constellations"
+    assert stack.theme.slug == "mix-mountains-constellations"
     assert all(r.anchor for r in stack.recipes)
 
 

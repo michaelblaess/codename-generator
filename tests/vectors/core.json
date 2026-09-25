@@ -223,17 +223,17 @@
     { "_note": "verworfen", "words": ["Orion", "Octans", "Aries", "Lyra", "Vela", "Carina", "Norma", "Ara"], "script": [3, 2, 5, 7, 1, 0, 7, 4, 3, 3, 7, 7], "expected": null }
   ],
   "coin_tokens": [
-    { "_note": "mehrteilig, Bindestrich, zu kurz, doppelt", "words": ["Ursa Minor", "Jean-Luc", "Ox", "orion", "Orion"], "expected": ["highland", "park", "jean", "luc", "orion"] }
+    { "_note": "mehrteilig, Bindestrich, zu kurz, doppelt", "words": ["Ursa Major", "Jean-Luc", "Ox", "orion", "Orion"], "expected": ["ursa", "major", "jean", "luc", "orion"] }
   ],
   "blend": [
-    { "first": "Aries", "second": "Arcturus", "expected": "Arrus" },
-    { "first": "Orion", "second": "Taurus", "expected": "Orisker" },
-    { "first": "Leo", "second": "Orion", "expected": null },
+    { "first": "Orion", "second": "Arcturus", "expected": "Orus" },
+    { "first": "Orion", "second": "Andromeda", "expected": "Oromeda" },
+    { "first": "Andromeda", "second": "Orion", "expected": "Andrion" },
     { "first": "Falke", "second": "Adler", "expected": "Faler" },
-    { "first": "Cassiopeia", "second": "Orion", "expected": null },
+    { "first": "Ursa Major", "second": "Orion", "expected": null },
     { "first": "Vega", "second": "Vega", "expected": null },
     { "first": "Ox", "second": "Orion", "expected": null },
-    { "first": "Bellatrix", "second": "Andromeda", "expected": "Bundromeda" },
+    { "first": "Kilimanjaro", "second": "Andromeda", "expected": "Kilimeda" },
     { "first": "Fuchs", "second": "Luchs", "expected": null },
     { "first": "Äskulap", "second": "Kranich", "expected": "Äskulanich" }
   ],
@@ -259,7 +259,7 @@
     { "name": "Sly Serpent", "language": "en", "expected": 100 },
     { "name": "Silent Swift Sparrow", "language": "en", "expected": 70 },
     { "name": "Quixotic Axolotl Pioneer Of Eternity", "language": "en", "expected": 4 },
-    { "name": "Mississippi", "language": "en", "expected": 98 }
+    { "name": "Mississippi", "language": "en", "expected": 94 }
   ],
   "filter": [
     { "name": "Silent Falcon", "filter": {"initial": "s"}, "language": "en", "expected": true },

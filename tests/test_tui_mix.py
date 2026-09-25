@@ -26,19 +26,19 @@ def test_mix_kreuzt_speichert_und_faellt_zurueck(isolated_settings: Path) -> Non
         app = CodenameApp()
         async with app.run_test(size=(150, 45)) as pilot:
             app.mutation_percent = 0
-            app._switch_theme("theme-whisky")
+            app._switch_theme("theme-mountains")
             await pilot.pause()
             vorher = [s.name for s in app.suggestions]
 
             app.query_one("#mix-select", Select).value = "constellations"
             await pilot.pause()
-            whisky = {w.casefold() for w in app.generator.themes["whisky"].words}
+            berge = {w.casefold() for w in app.generator.themes["mountains"].words}
             sterne = {w.casefold() for w in app.generator.themes["constellations"].words}
             recipes = app._recipes[app._theme_key()]
             assert len(recipes) == app.suggestion_count
             for r in recipes:
-                assert r.anchor.casefold() in whisky and r.theme_word.casefold() in sterne
-            assert "Whisky x Constellations" in str(app.query_one("#info", Static).content)
+                assert r.anchor.casefold() in berge and r.theme_word.casefold() in sterne
+            assert "Mountains x Constellations" in str(app.query_one("#info", Static).content)
             gespeichert = json.loads(isolated_settings.read_text(encoding="utf-8"))
             assert gespeichert["mix_partner"] == "constellations"
 

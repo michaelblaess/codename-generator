@@ -418,7 +418,7 @@ def test_variant_keep_word_on_anchor_is_empty() -> None:
 
 @pytest.mark.parametrize(
     ("first", "second", "language"),
-    [("whisky", "constellations", "en"), ("tierwelt", "greek-gods", "de")],
+    [("mountains", "constellations", "en"), ("tierwelt", "greek-gods", "de")],
 )
 def test_crossed_themes_use_each_word_once(first: str, second: str, language: str) -> None:
     """Themen-Mix: je ein Wort aus beiden Themes, keins doppelt, nie dasselbe zweimal."""
@@ -453,7 +453,7 @@ def test_crossed_theme_never_pairs_a_word_with_itself() -> None:
 def test_crossed_variant_keeps_first_word() -> None:
     """Zusatz halten auf einem Mix-Treffer behaelt das Wort aus dem ersten Theme."""
     gen = Generator.load(seed=4)
-    a, b = gen.themes["whisky"], gen.themes["constellations"]
+    a, b = gen.themes["mountains"], gen.themes["constellations"]
     theme = gen.crossed_theme(a, b, "en")
     base = gen.generate_crossed_recipes(a, b, 1)[0]
     recipes = gen.generate_variant_recipes(base, theme, VariantKeep.MODIFIER, 20, "en")

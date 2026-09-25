@@ -21,16 +21,16 @@
 [![Python](https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Themes](https://img.shields.io/badge/themes-23-yellow)](src/codename_generator/data/themes)
 
-Ein Codename-Generator für das Terminal. Wähle ein Thema (griechische Götter, Rennpferde, Edelsteine, Whisky, ...) und erhalte einen Stapel einzigartiger Vorschläge (10 bis 40, frei wählbar), kombiniert mit Adjektiv- oder Verb-Modifikatoren und optionalen phonetischen Mutationen.
+Ein Codename-Generator für das Terminal. Wähle ein Thema (griechische Götter, Rennpferde, Edelsteine, Sternbilder, ...) und erhalte einen Stapel einzigartiger Vorschläge (10 bis 40, frei wählbar), kombiniert mit Adjektiv- oder Verb-Modifikatoren und optionalen phonetischen Mutationen.
 
 ## Themen
 
-Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Gefährliche Tiere · Rennpferde · Blumen · Edelsteine · Weine · Whisky · Berge · Pilze · Historische Schiffe · Wahrzeichen · Dev · Flugsicherung · Random (gepoolt)
+Griechische Götter · Ägyptische Götter · Nordische Götter · Sternbilder · Tierkreiszeichen · Tiere · Gefährliche Tiere · Rennpferde · Blumen · Edelsteine · Berge · Pilze · Historische Schiffe · Wahrzeichen · Dev · Flugsicherung · Random (gepoolt)
 
 Deutsche Themen (`language: de`): Tierwelt · Sagenwesen · Wetter und Landschaft · Random (DE)
 
 Themen, deren Wörter Eigennamen sind (griechische/ägyptische/nordische Götter,
-Rennpferde, Berge, Wahrzeichen, historische Schiffe, Whisky, Weine), stehen auf
+Rennpferde, Berge, Wahrzeichen, historische Schiffe), stehen auf
 `language: neutral`. Sie erscheinen in jeder Sprache
 und übernehmen die Modifikatoren der gewählten - `Silent Secretariat` auf
 Englisch, `Stiller Secretariat` auf Deutsch.
@@ -76,8 +76,8 @@ vorn oder hinten steht. Mit einem Partner-Thema mutiert nur dessen Wort, deins b
 unverändert. Eine feste Position oder ein Partner-Thema legen zwei Wörter fest.
 
 **Themen-Mix** (*Mix with* im Einstellungspanel): Das aktive Thema wird mit einem
-zweiten gekreuzt, jeder Name besteht aus je einem Wort beider Themen (`Snowdon Lepus`,
-`Fomalhaut Lhotse`). Jedes Wort kommt pro Stapel höchstens einmal vor. Themen der anderen
+zweiten gekreuzt, jeder Name besteht aus je einem Wort beider Themen (`Matterhorn Monoceros`,
+`Snowdon Aries`). Jedes Wort kommt pro Stapel höchstens einmal vor. Themen der anderen
 Sprache gehen auch, sie tragen in der Liste ihr Sprachkürzel (`Constellations (EN)`).
 
 **Variieren:** `w` hält das Wort des markierten Treffers und würfelt neue Zusätze
@@ -87,9 +87,9 @@ heraus geht es mit `w`/`m` weiter, `r` würfelt neu, ein Eintrag in der Themenli
 zurück.
 
 **Methoden** (Leiste über der Liste): *Theme words* ist das bisherige Verfahren. *Coined
-words* erfindet neue Wörter im Klang des Themas (`Lintora`, `Nories`), ein Mix-Partner
+words* erfindet neue Wörter im Klang des Themas (`Athelion`, `Leidon`), ein Mix-Partner
 bringt seinen Klang dazu. *Blends* verschmelzen zwei Themenwörter an einem gemeinsamen
-Buchstaben (`Orion` + `Taurus` = `Orisker`), mit Mix-Partner kommt die hintere Hälfte aus
+Buchstaben (`Orion` + `Andromeda` = `Oromeda`), mit Mix-Partner kommt die hintere Hälfte aus
 dem zweiten Thema. *Acronym* nimmt bis zu drei Buchstaben, jedes Wort des Namens beginnt
 mit seinem (`SM` -> `Silent Marten`). Kunst- und Kofferwörter bekommen Zusätze wie jedes
 Themenwort.
@@ -128,16 +128,16 @@ uv run codename --list-themes
 uv run codename -t greek-gods           # 30 suggestions (default)
 uv run codename -t flowers -n 5 --mutation-chance 0.6 --seed 42
 uv run codename -t random -n 20         # pulls from every theme
-uv run codename -t whisky --words 3     # exactly 3 components per name
+uv run codename -t mountains --words 3  # exactly 3 components per name
 uv run codename --list-themes --lang de  # deutsche plus neutrale Themen
 uv run codename -t tierwelt -n 10       # deutsche Namen, korrekt gebeugt
 uv run codename -t racehorses --lang de  # Eigennamen, deutsche Modifikatoren
 uv run codename -w Sitemap              # eigenes Wort mit Zusätzen
 uv run codename -w Sitemap -t constellations --position front   # Sitemap Orion ...
-uv run codename -t whisky --mix constellations   # Snowdon Lepus ...
+uv run codename -t mountains --mix constellations   # Matterhorn Monoceros ...
 uv run codename -t animals --tone dark                     # nur düstere Zusätze
-uv run codename -t whisky --method coined --words 1        # Lintora, Nories ...
-uv run codename -t whisky --mix constellations --method blend --words 1
+uv run codename -t greek-gods --method coined --words 1    # Athelion, Leidon ...
+uv run codename -t greek-gods --mix constellations --method blend --words 1
 uv run codename -t animals --method acronym --letters SM   # Silent Marten ...
 uv run codename -t animals --initial s --max-syllables 3 --alliteration --sort
 uv run codename --export-favorites favoriten.json          # für die Webfassung
