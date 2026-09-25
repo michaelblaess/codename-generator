@@ -65,9 +65,9 @@ run.bat          # Windows
 uv run codename  # jede Plattform
 ```
 
-Tasten: `r` neu generieren · `n` Name kopieren · `f` Favorit · `+` eigene Idee · `o` eigenes Wort · `w` Wort halten · `m` Zusatz halten · `l` Sprache · `s` Einstellungen · `i` Info · `q` beenden. Ohne Eintrag in der Fußzeile: `c` Slug kopieren, `v` Favoriten, `u` Mutation +25%, `t` Farbthema, `?` alle Tasten.
+Tasten: `r` neu generieren · `n` Name kopieren · `f` Favorit · `+` eigene Idee · `o` eigenes Wort · `w` neue Zusätze · `m` neues Wort · `l` Sprache · `s` Einstellungen · `i` Info · `q` beenden. Ohne Eintrag in der Fußzeile: `c` Slug kopieren, `v` Favoriten, `u` Mutation +25%, `t` Farbthema, `?` alle Tasten.
 
-Die Belegung folgt der gemeinsamen Konvention aller meiner TUIs ([SHORTCUTS.md](https://github.com/michaelblaess/textual-widgets/blob/main/SHORTCUTS.md)). Unter `s` -> *Keyboard* lässt sie sich auf F-Tasten umstellen (F1 Info, F2 Einstellungen, F5 neu generieren, F7 eigenes Wort, F8 Wort halten, F9 Zusatz halten, F10 Sprache - die Buchstaben bleiben daneben), dazu gibt es eine Vim-Navigation für die Tabelle. Eigene Belegungen stehen in `settings.json` unter `keymap_custom`, `?` zeigt, was gerade gilt.
+Die Belegung folgt der gemeinsamen Konvention aller meiner TUIs ([SHORTCUTS.md](https://github.com/michaelblaess/textual-widgets/blob/main/SHORTCUTS.md)). Unter `s` -> *Keyboard* lässt sie sich auf F-Tasten umstellen (F1 Info, F2 Einstellungen, F5 neu generieren, F7 eigenes Wort, F8 neue Zusätze, F9 neues Wort, F10 Sprache - die Buchstaben bleiben daneben), dazu gibt es eine Vim-Navigation für die Tabelle. Eigene Belegungen stehen in `settings.json` unter `keymap_custom`, `?` zeigt, was gerade gilt.
 
 **Eigenes Wort** (`o`, Eintrag *Custom Seed*): Dein Wort wird mit Adjektiven und Verben
 kombiniert oder, über *Seed partner* im Einstellungspanel, mit den Wörtern eines

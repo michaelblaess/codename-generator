@@ -65,9 +65,9 @@ run.bat          # Windows
 uv run codename  # any platform
 ```
 
-Keys: `r` regenerate · `n` copy name · `f` favorite · `+` your own idea · `o` your own word · `w` keep word · `m` keep modifier · `l` language · `s` settings · `i` info · `q` quit. Not in the footer: `c` copy slug, `v` favorites, `u` mutation +25%, `t` colour theme, `?` every key.
+Keys: `r` regenerate · `n` copy name · `f` favorite · `+` your own idea · `o` your own word · `w` new modifiers · `m` new word · `l` language · `s` settings · `i` info · `q` quit. Not in the footer: `c` copy slug, `v` favorites, `u` mutation +25%, `t` colour theme, `?` every key.
 
-The layout follows the shared convention of all my TUIs ([SHORTCUTS.md](https://github.com/michaelblaess/textual-widgets/blob/main/SHORTCUTS.md)). Under `s` -> *Keyboard* you can switch to function keys (F1 info, F2 settings, F5 regenerate, F7 own word, F8 keep word, F9 keep modifier, F10 language - the letters stay next to them), plus vim navigation for the table. Own bindings go into `settings.json` under `keymap_custom`, `?` shows what is bound right now.
+The layout follows the shared convention of all my TUIs ([SHORTCUTS.md](https://github.com/michaelblaess/textual-widgets/blob/main/SHORTCUTS.md)). Under `s` -> *Keyboard* you can switch to function keys (F1 info, F2 settings, F5 regenerate, F7 own word, F8 new modifiers, F9 new word, F10 language - the letters stay next to them), plus vim navigation for the table. Own bindings go into `settings.json` under `keymap_custom`, `?` shows what is bound right now.
 
 **Your own word** (`o`, entry *Custom Seed*): your word is combined with adjectives and
 verbs or, via *Seed partner* in the settings panel, with the words of a theme
