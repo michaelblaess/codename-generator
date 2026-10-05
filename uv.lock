@@ -168,7 +168,7 @@ wheels = [
 ]
 
 [[package]]
-name = "codename-generator"
+name = "codename-factory"
 version = "0.4.1"
 source = { editable = "." }
 dependencies = [
