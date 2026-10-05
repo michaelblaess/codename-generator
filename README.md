@@ -55,6 +55,18 @@ setup.bat        # Windows
 
 Requires [uv](https://docs.astral.sh/uv/).
 
+### Run without installing (uv)
+
+On PyPI the package is called **codename-factory** (the name `codename-generator` is too close
+to an existing project there). It needs Python 3.13:
+
+```bash
+uvx --python 3.13 --from codename-factory codename
+```
+
+Or install it with `pip install codename-factory`, which provides the commands `codename` and
+`codename-generator`.
+
 ## Usage
 
 ### TUI (default)
